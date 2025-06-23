@@ -1,10 +1,11 @@
 const fs = require('fs');
 const Parser = require('rss-parser');
-const { TwitterApi } = require('twitter-api-v2'); // ← updated line
+const { TwitterApi } = require('twitter-api-v2');
 
 const parser = new Parser();
 
-const feedUrl = 'https://www.youtube.com/feeds/videos.xml?channel_id=UC09QwXpdgjgd6l8BFBRlZMw';
+// 👉 Replace this with your actual channel ID
+const feedUrl = 'https://www.youtube.com/feeds/videos.xml?channel_id=YOUR_CHANNEL_ID';
 const lastPostedFile = 'last-posted.txt';
 
 (async () => {
