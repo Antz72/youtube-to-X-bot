@@ -1,5 +1,9 @@
 name: Post YouTube Video to X
 
+const fs = require('fs');
+const Parser = require('rss-parser');
+const { TwitterApi } = require('twitter-api-v2'); // ← updated line
+
 on:
   schedule:
     - cron: '0,30 * * * *'  # Runs every half hour
@@ -19,5 +23,5 @@ jobs:
 
       - name: Run script
         run: |
-          npm install rss-parser twitter
+          npm install rss-parser twitter-a
           node $GITHUB_WORKSPACE/post.js
