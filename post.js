@@ -5,7 +5,7 @@ const { TwitterApi } = require('twitter-api-v2');
 const parser = new Parser();
 
 // 👉 Replace this with your actual channel ID
-const feedUrl = 'https://www.youtube.com/feeds/videos.xml?channel_id=YOUR_CHANNEL_ID';
+const feedUrl = 'https://www.youtube.com/feeds/videos.xml?channel_id=UC09QwXpdgjgd6l8BFBRlZMw';
 const lastPostedFile = 'last-posted.txt';
 
 (async () => {
