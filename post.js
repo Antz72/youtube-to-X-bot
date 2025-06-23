@@ -1,6 +1,6 @@
 const fs = require('fs');
 const Parser = require('rss-parser');
-const { TwitterApi } = require('twitter');
+const { TwitterApi } = require('twitter-api-v2'); // ← updated line
 
 const parser = new Parser();
 
