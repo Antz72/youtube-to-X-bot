@@ -17,6 +17,13 @@ jobs:
         with:
           node-version: '18'
 
+      - name: Print working directory and list files (for debugging)
+        run: |
+          echo "📂 Current working directory:"
+          pwd
+          echo "📁 Files in this directory:"
+          ls -la
+
       - name: Install dependencies and run script
         run: |
           npm install rss-parser twitter-api-v2
