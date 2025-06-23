@@ -19,10 +19,12 @@ jobs:
 
       - name: Print working directory and list files (for debugging)
         run: |
-          echo "📂 Current working directory:"
-          pwd
+          echo "📂 Current working directory: $(pwd)"
           echo "📁 Files in this directory:"
           ls -la
+
+      - name: Test Twitter API tokens
+        run: node test-tokens.js
 
       - name: Install dependencies and run script
         run: |
