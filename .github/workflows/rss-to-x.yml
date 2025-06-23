@@ -1,0 +1,23 @@
+name: Post YouTube Video to X
+
+on:
+  schedule:
+    - cron: '0 * * * *'  # Runs every hour
+  workflow_dispatch:
+
+jobs:
+  post-to-x:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Fetch RSS and Post to X
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Run script
+        run: |
+          npm install rss-parser twitter
+          node post.js
