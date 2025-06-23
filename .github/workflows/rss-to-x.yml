@@ -24,4 +24,4 @@ jobs:
       - name: Run script
         run: |
           npm install rss-parser twitter-a
-          node $GITHUB_WORKSPACE/post.js
+          node post.js
