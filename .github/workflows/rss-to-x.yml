@@ -23,12 +23,16 @@ jobs:
         with:
           name: last-posted-id
           path: . # Download to the current directory
+        continue-on-error: true # <--- This line allows it to proceed if artifact isn't found (first run)
 
       - name: Print working directory and list files (for debugging)
         run: |
           echo "Current working directory: $(pwd)"
           echo "Files in this directory:"
           ls -la
+          # Confirm last-posted.txt exists here on subsequent runs
+          cat last-posted.txt || echo "last-posted.txt not found (expected on first run)"
+
 
       - name: Test Twitter API tokens
         env:
