@@ -11,9 +11,29 @@ const lastPostedFile = 'last-posted.txt';
 const templateIndexFile = 'template-indices.json';
 
 // --- DRY RUN MODE ---
-// Set to 'true' to prevent tweets from actually being posted.
-// Set to 'false' when you want to resume live posting.
-const DRY_RUN = process.env.DRY_RUN_MODE === 'true'; // Reads from environment variable
+
+const fs = require('fs'); // Make sure fs is at the top, which it already is.
+
+// --- Configuration ---
+// ... (rest of your configuration) ...
+const dryRunConfigFile = 'dry-run-config.txt'; // Define the path to your new config file
+
+// --- DRY RUN MODE ---
+let DRY_RUN = true; // Default to true (safe)
+if (fs.existsSync(dryRunConfigFile)) {
+    try {
+        const dryRunSetting = fs.readFileSync(dryRunConfigFile, 'utf-8').trim().toLowerCase();
+        DRY_RUN = dryRunSetting === 'true';
+    } catch (e) {
+        console.error(`Error reading ${dryRunConfigFile}:`, e.message);
+        console.log('Defaulting DRY_RUN to true due to error.');
+        DRY_RUN = true; // Fallback to safe mode if file read fails
+    }
+} else {
+    console.log(`Warning: ${dryRunConfigFile} not found. Defaulting DRY_RUN to true.`);
+    DRY_RUN = true; // Default to true if file doesn't exist
+}
+
 
 // --- Initialize YouTube API Client ---
 const youtube = google.youtube({
