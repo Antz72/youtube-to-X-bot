@@ -9,7 +9,7 @@ const YOUTUBE_API_KEY = process.env.YOUTUBE_API_KEY;
 
 const lastPostedFile = 'last-posted.txt';
 const templateIndexFile = 'template-indices.json';
-const runModeFile = 'run_mode.txt'; // Renamed from dryRunConfigFile
+const runModeFile = 'run-mode.txt'; // CORRECTED: Now uses hyphen
 
 // --- Hashtag Configuration ---
 const STATIC_HASHTAGS = ['#Gaming', '#PCGaming', '#NewVideo']; // Your static hashtags
@@ -28,7 +28,7 @@ const youtube = google.youtube({
 // --- Utility function for time formatting ---
 function formatTimeForTweet(isoDateString) {
     const date = new Date(isoDateString);
-    // Format for New Zealand Standard Time (NZST), e.g., Mon, 24 Jun at 3:00 PM
+    // Format for New Zealand Standard Standard Time (NZST), e.g., Mon, 24 Jun at 3:00 PM
     return date.toLocaleString('en-NZ', {
         weekday: 'short',
         day: 'numeric',
@@ -321,8 +321,8 @@ async function main() {
 
                 // If in 'repost' mode, revert run_mode.txt to 'true' after posting
                 if (runMode === 'repost') {
-                    fs.writeFileSync(runModeFile, 'false'); // Revert to default dry run mode
-                    console.log(`Reverted ${runModeFile} to 'false' after repost.`);
+                    fs.writeFileSync(runModeFile, 'true'); // Revert to default dry run mode
+                    console.log(`Reverted ${runModeFile} to 'true' after repost.`);
                 }
             }
         }
