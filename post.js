@@ -45,9 +45,10 @@ async function getYouTubeVideos() {
 
         const uploadsPlaylistId = channelResponse.data.items[0].contentDetails.relatedPlaylists.uploads;
 
-        // Fetch enough items to find a recent upcoming or published video, and also live status
+        // Fetch enough items to find a recent upcoming or published video
+        // We'll fetch detailed video status for each below.
         const playlistItemsResponse = await youtube.playlistItems.list({
-            part: 'snippet',
+            part: 'snippet', // Still need snippet for title and videoId
             playlistId: uploadsPlaylistId,
             maxResults: 10, // Get up to 10 recent items
         });
@@ -57,94 +58,107 @@ async function getYouTubeVideos() {
             return null;
         }
 
-        let currentlyLiveVideo = null; // NEW variable for live streams
+        let currentlyLiveVideo = null;
         let nextUpcomingVideo = null;
         let mostRecentPublishedVideo = null;
         const now = new Date(); // Current time to check against scheduled time
 
+        // Iterate through playlist items and fetch full video details for accurate status
         for (const item of playlistItemsResponse.data.items) {
             const videoId = item.snippet.resourceId.videoId;
-            const liveBroadcastContent = item.snippet.liveBroadcastContent; // 'upcoming', 'live', 'none', 'completed'
-            const publishedAt = new Date(item.snippet.publishedAt); // This is the scheduled time for 'upcoming'
+            const videoTitle = item.snippet.title;
 
             // --- ADDED DEBUG LOGGING START ---
-            console.log(`--- Processing Video: ${item.snippet.title} (ID: ${videoId}) ---`);
-            console.log(`  liveBroadcastContent: ${liveBroadcastContent}`);
-            console.log(`  publishedAt (ISO): ${item.snippet.publishedAt}`);
-            console.log(`  publishedAt (Date object): ${publishedAt}`);
+            console.log(`--- Processing Video: ${videoTitle} (ID: ${videoId}) ---`);
+            console.log(`  Initial liveBroadcastContent from playlist item: ${item.snippet.liveBroadcastContent}`);
+            // --- ADDED DEBUG LOGGING END ---
+
+            // Always fetch detailed video information including liveStreamingDetails
+            const videoDetailsResponse = await youtube.videos.list({
+                part: 'snippet,liveStreamingDetails',
+                id: videoId,
+            });
+
+            const videoDetails = videoDetailsResponse.data.items[0];
+            if (!videoDetails) {
+                console.log(`  No details found for video ID: ${videoId}. Skipping.`);
+                continue;
+            }
+
+            const snippet = videoDetails.snippet;
+            const liveDetails = videoDetails.liveStreamingDetails;
+            const publishedAt = new Date(snippet.publishedAt); // This is the actual publish date for regular videos, or scheduled for streams
+
+            // --- ADDED DEBUG LOGGING START ---
+            console.log(`  PublishedAt from video details: ${snippet.publishedAt}`);
+            console.log(`  PublishedAt (Date object): ${publishedAt}`);
             console.log(`  Current time (Date object): ${now}`);
             console.log(`  Is publishedAt in future? ${publishedAt > now}`);
+            if (liveDetails) {
+                console.log(`  Live Streaming Details:`);
+                console.log(`    actualStartTime: ${liveDetails.actualStartTime || 'N/A'}`);
+                console.log(`    scheduledStartTime: ${liveDetails.scheduledStartTime || 'N/A'}`);
+            } else {
+                console.log(`  No Live Streaming Details found.`);
+            }
             // --- ADDED DEBUG LOGGING END ---
 
 
-            if (liveBroadcastContent === 'live') {
-                // If a video is currently live, fetch its liveStreamingDetails for actual start time
-                const videoDetailsResponse = await youtube.videos.list({
-                    part: 'liveStreamingDetails',
+            // --- Determine video type based on comprehensive details ---
+            if (liveDetails && liveDetails.actualStartTime) {
+                // Video is currently live or was recently live
+                // This is the highest priority, so if we find one, we use it immediately.
+                currentlyLiveVideo = {
                     id: videoId,
-                });
-
-                const liveDetails = videoDetailsResponse.data.items[0]?.liveStreamingDetails;
-                if (liveDetails) {
-                    console.log(`  Live Streaming Details:`);
-                    console.log(`    actualStartTime: ${liveDetails.actualStartTime || 'N/A'}`);
-                    console.log(`    scheduledStartTime: ${liveDetails.scheduledStartTime || 'N/A'}`);
-                }
-
-                if (liveDetails && liveDetails.actualStartTime) {
-                    // We found a live video with an actual start time. This is highest priority.
-                    currentlyLiveVideo = {
-                        id: videoId,
-                        title: item.snippet.title,
-                        link: `https://youtube.com/watch?v=${videoId}`, // Corrected link format
-                        publishedAt: item.snippet.publishedAt, // Still the original publishedAt
-                        type: 'live', // NEW type
-                    };
-                    break; // Found the live one, no need to check others for now
-                }
-            } else if (liveBroadcastContent === 'upcoming' && publishedAt > now) {
-                // If there's an upcoming video and its scheduled time is in the future
-                if (!nextUpcomingVideo || publishedAt < new Date(nextUpcomingVideo.publishedAt)) {
-                    // Prioritize the *earliest* upcoming video
+                    title: videoTitle,
+                    link: `https://www.youtube.com/watch?v=$${videoId}`,
+                    publishedAt: snippet.publishedAt, // Using the original publishedAt
+                    type: 'live',
+                };
+                break; // Found the live one, no need to check others for now
+            } else if (liveDetails && liveDetails.scheduledStartTime && new Date(liveDetails.scheduledStartTime) > now) {
+                // Video is an upcoming stream and its scheduled time is in the future
+                if (!nextUpcomingVideo || new Date(liveDetails.scheduledStartTime) < new Date(nextUpcomingVideo.publishedAt)) {
+                    // Prioritize the *earliest* upcoming video by its scheduled time
                     nextUpcomingVideo = {
                         id: videoId,
-                        title: item.snippet.title,
-                        link: `https://youtube.com/watch?v=${videoId}`, // Corrected link format
-                        publishedAt: item.snippet.publishedAt, // Keep original ISO string for formatting
+                        title: videoTitle,
+                        link: `https://www.youtube.com/watch?v=$${videoId}`,
+                        publishedAt: liveDetails.scheduledStartTime, // Use scheduledStartTime for upcoming
                         type: 'upcoming',
                     };
                 }
-            } else if (liveBroadcastContent === 'none' || liveBroadcastContent === 'completed') {
-                // If it's a regular video or a completed live stream
+            } else {
+                // It's a regular published video or a completed stream/VOD.
+                // Note: completed live streams will often have liveDetails but no scheduledStartTime in future
                 if (!mostRecentPublishedVideo || publishedAt > new Date(mostRecentPublishedVideo.publishedAt)) {
                     // Prioritize the *most recent* published video
                     mostRecentPublishedVideo = {
                         id: videoId,
-                        title: item.snippet.title,
-                        link: `https://youtube.com/watch?v=${videoId}`, // Corrected link format
-                        publishedAt: item.snippet.publishedAt,
+                        title: videoTitle,
+                        link: `https://www.youtube.com/watch?v=$${videoId}`,
+                        publishedAt: snippet.publishedAt,
                         type: 'published',
                     };
                 }
             }
         }
 
-        // Prioritize: Live > Upcoming > Published
+        // Final prioritization: Live > Upcoming > Published
         if (currentlyLiveVideo) {
-            console.log(`Debug: Selected Live Video: ${currentlyLiveVideo.title}`);
+            console.log(`Debug: Selected Live Video: ${currentlyLiveVideo.title} (ID: ${currentlyLiveVideo.id})`);
             return currentlyLiveVideo;
         } else if (nextUpcomingVideo) {
-            console.log(`Debug: Selected Upcoming Video: ${nextUpcomingVideo.title}`);
+            console.log(`Debug: Selected Upcoming Video: ${nextUpcomingVideo.title} (ID: ${nextUpcomingVideo.id})`);
             return nextUpcomingVideo;
         } else if (mostRecentPublishedVideo) {
-            console.log(`Debug: Selected Published Video: ${mostRecentPublishedVideo.title}`);
+            console.log(`Debug: Selected Published Video: ${mostRecentPublishedVideo.title} (ID: ${mostRecentPublishedVideo.id})`);
             return mostRecentPublishedVideo;
         }
 
         return null; // No relevant video found
     } catch (error) {
         console.error('Error fetching YouTube videos from API:', error.message);
-        // Log more details if available
         if (error.response && error.response.data) {
             console.error('YouTube API Error Details:', error.response.data);
         }
@@ -166,7 +180,6 @@ async function postTweet(tweetText) {
         console.log('✅ Tweet posted!');
     } catch (e) {
         console.error('❌ Error posting tweet:', e);
-        // Log more specific Twitter API errors
         if (e.data && e.data.errors) {
             e.data.errors.forEach(err => {
                 console.error(`Twitter API Error: Code ${err.code} - ${err.message}`);
@@ -214,8 +227,8 @@ function getCyclingTweet(title, link, videoType, scheduledTime = '') {
     const templateFn = templatesForType[selectedTemplateIndex];
     if (videoType === 'upcoming') {
         return templateFn(title, link, hashtagTitle, scheduledTime);
-    } else if (videoType === 'live') { // NEW: Handle 'live' type
-        return templateFn(title, link, hashtagTitle); // 'live' templates don't need formatted time
+    } else if (videoType === 'live') {
+        return templateFn(title, link, hashtagTitle);
     } else { // 'published' type
         return templateFn(title, link, hashtagTitle);
     }
@@ -248,7 +261,7 @@ async function main() {
             if (type === 'upcoming') {
                 const formattedTime = formatTimeForTweet(publishedAt);
                 tweet = getCyclingTweet(title, link, type, formattedTime);
-            } else if (type === 'live') { // NEW: Handle 'live' type
+            } else if (type === 'live') {
                 tweet = getCyclingTweet(title, link, type);
             } else { // type === 'published'
                 tweet = getCyclingTweet(title, link, type);
