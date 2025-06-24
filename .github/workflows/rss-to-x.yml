@@ -45,7 +45,9 @@ jobs:
         run: node test-tokens.js
 
       - name: Install dependencies
-        run: npm install rss-parser twitter-api-v2
+        run: |
+          npm install twitter-api-v2
+          npm install googleapis
 
       - name: Run script
         env:
