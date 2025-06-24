@@ -2,7 +2,7 @@ const Parser = require('rss-parser');
 const { TwitterApi } = require('twitter-api-v2');
 const fs = require('fs');
 
-const rssUrl = 'https://www.youtube.com/feeds/videos.xml?channel_id=UCvTjD92w-vF7_M7_M7_M7_M'; // Replace with your actual channel ID
+const rssUrl = 'https://www.youtube.com/feeds/videos.xml?channel_id=UC09QwXpdgjgd6l8BFBRlZMw'; // Replace with your actual channel ID
 
 const lastPostedFile = 'last-posted.txt'; // This file will store the ID of the last posted video
 
