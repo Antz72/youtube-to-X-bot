@@ -2,8 +2,8 @@ name: Post New YouTube Videos to X
 
 on:
   schedule:
-    # Run every 10 minutes (adjust this cron schedule if you want it more or less frequent)
-    # The cron string '*/10 * * * *' means "at every 10th minute".
+    # Run every 30 minutes (adjust this cron schedule if you want it more or less frequent)
+    # The cron string '*/30 * * * *' means "at every 30th minute".
     - cron: '*/30 * * * *'
   workflow_dispatch: # Allows you to manually trigger the workflow from the GitHub Actions tab
 
@@ -20,22 +20,29 @@ jobs:
       with:
         node-version: '18' # Specifies Node.js version 18
 
-    - name: Cache Node.js modules and bot data
-      uses: actions/cache@v4 # Caches installed modules and your last-posted.txt/template-indices.json
+    # Old 'Cache Node.js modules and bot data' step is being replaced/split
+
+    - name: Cache Node.js modules
+      uses: actions/cache@v4
       with:
-        path: |
-          node_modules
-          last-posted.txt
-          template-indices.json
-        # Key uses runner OS and a hash of package-lock.json to create a unique cache key
+        path: node_modules
         key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
-        # Restore keys provide fallbacks if the primary key doesn't hit
         restore-keys: |
           ${{ runner.os }}-node-
 
+    - name: Cache Bot State Files
+      uses: actions/cache@v4
+      with:
+        path: |
+          last-posted.txt
+          template-indices.json
+        key: ${{ runner.os }}-bot-state-${{ github.run_id }} # Unique key for saving this run's state
+        restore-keys: |
+          ${{ runner.os }}-bot-state- # Restore from the latest state cache
+        save-always: true # Crucial: Ensures changes to these files are saved back to the cache
+
     - name: Install dependencies
-      # This command reads your package.json and installs googleapis and twitter-api-v2
-      run: npm install
+      run: npm install # This command reads your package.json and installs googleapis and twitter-api-v2
 
     - name: Run bot script
       run: node post.js # Executes your main bot script
