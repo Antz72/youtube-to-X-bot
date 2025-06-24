@@ -29,7 +29,7 @@ const lastPostedFile = 'last-posted.txt';
         accessSecret: process.env.TWITTER_ACCESS_SECRET,
       });
 
-      const tweet = const tweet = `🎬 NEW VIDEO! ${title}\n\n👉 Watch now: ${link}\n\n#YouTube #NewVideo #${title.replace(/[^a-zA-Z0-9]/g, '').substring(0,20)} #Gaming #SmallStreamers (or replace with your niche)`;;
+      const tweet = `🎬 NEW VIDEO! ${title}\n\n👉 Watch now: ${link}\n\n#YouTube #NewVideo #${title.replace(/[^a-zA-Z0-9]/g, '').substring(0,20)} #Gaming`; // Using #Gaming as example niche
       await client.v2.tweet(tweet);
 
       fs.writeFileSync(lastPostedFile, id);
