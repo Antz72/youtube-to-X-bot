@@ -17,21 +17,26 @@ jobs:
         with:
           node-version: '18'
 
+      # DIAGNOSTIC STEP: List artifacts before attempting download
+      - name: List artifacts before download
+        run: |
+          gh run view ${{ github.run_id }} --json artifacts | jq '.artifacts[] | .name, .id'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }} # GITHUB_TOKEN is automatically provided
+
       # Step 1: Download the last-posted.txt artifact from the previous run
-      # This will fail on the very first run of this *workflow*, but continue-on-error allows the job to proceed.
       - name: Download last posted ID
         uses: actions/download-artifact@v4
         with:
           name: last-posted-id
           path: . # Download to the current directory
-        continue-on-error: true # <--- THIS IS CRITICAL AND MUST BE PRESENT
+        continue-on-error: true # Keep this for now so the job doesn't stop if it fails
 
       - name: Print working directory and list files (for debugging)
         run: |
           echo "Current working directory: $(pwd)"
           echo "Files in this directory:"
           ls -la
-          # Confirm last-posted.txt exists here (either from manual commit or downloaded artifact)
           cat last-posted.txt || echo "last-posted.txt not found (expected if artifact download failed AND no manual file)"
 
 
@@ -60,4 +65,11 @@ jobs:
         with:
           name: last-posted-id
           path: last-posted.txt
-          retention-days: 1 # You can adjust retention, 1 day means it's available for the next daily run
+          retention-days: 1 # Keep retention low for testing
+
+      # DIAGNOSTIC STEP: List artifacts after upload
+      - name: List artifacts after upload
+        run: |
+          gh run view ${{ github.run_id }} --json artifacts | jq '.artifacts[] | .name, .id'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }} # GITHUB_TOKEN is automatically provided
