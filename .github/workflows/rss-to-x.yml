@@ -17,21 +17,23 @@ jobs:
         with:
           node-version: '18'
 
-      # Step 1: Restore last-posted.txt from cache
-      - name: Cache last posted ID
+      # Step 1: Restore last-posted.txt and template-indices.json from cache
+      - name: Cache last posted ID and template indices
         uses: actions/cache@v4
-        id: cache-last-posted # ID for this step, used to check cache hit/miss
+        id: cache-data # ID for this step, used to check cache hit/miss
         with:
-          path: last-posted.txt
-          key: ${{ runner.os }}-last-posted-id # Cache key. Includes OS to be unique.
+          path: |
+            last-posted.txt
+            template-indices.json # NEW: Add this path to cache
+          key: ${{ runner.os }}-post-bot-data # Changed key to reflect multiple files
 
       - name: Print working directory and list files (for debugging)
         run: |
           echo "Current working directory: $(pwd)"
           echo "Files in this directory:"
           ls -la
-          # Confirm last-posted.txt exists here (either from cache or manual commit)
           cat last-posted.txt || echo "last-posted.txt not found (expected if cache miss AND no manual file)"
+          cat template-indices.json || echo "template-indices.json not found (expected if cache miss or first run)"
 
 
       - name: Test Twitter API tokens
@@ -53,13 +55,13 @@ jobs:
           TWITTER_ACCESS_SECRET: ${{ secrets.TWITTER_ACCESS_SECRET }}
         run: node post.js
 
-      # Step 2: Save last-posted.txt to cache for the next run
-      # This step only runs if the cache was not a hit (meaning last-posted.txt was modified or newly created)
-      # or if the cache was a hit and we want to update it.
-      - name: Save last posted ID to cache
+      # Step 2: Save updated files to cache for the next run
+      - name: Save updated data to cache
         uses: actions/cache@v4
         with:
-          path: last-posted.txt
-          key: ${{ runner.os }}-last-posted-id
-          restore-keys: | # Allows re-saving with the same key even if content changed
-            ${{ runner.os }}-last-posted-id
+          path: |
+            last-posted.txt
+            template-indices.json # NEW: Add this path to cache
+          key: ${{ runner.os }}-post-bot-data # Changed key to reflect multiple files
+          restore-keys: |
+            ${{ runner.os }}-post-bot-data
