@@ -1,61 +1,75 @@
-name: Post New YouTube Videos to X
+name: YouTube to X Bot
 
 on:
+  # This section defines when the workflow will run.
+  # Adjust the 'cron' schedule as needed for how often you want it to run.
+  # The example below runs every hour.
   schedule:
-    - cron: '*/30 * * * *' # Runs every 30 minutes
-  workflow_dispatch: # Allows manual trigger from GitHub UI
+    - cron: '0 * * * *' # Runs at minute 0 of every hour
+  
+  # This allows you to manually trigger the workflow from the GitHub UI.
+  workflow_dispatch:
 
 jobs:
   post-to-x:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04 # Or 'ubuntu-latest'
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          repository: Antz72/youtube-to-X-bot
+          fetch-depth: 1 # Fetches only the last commit, as seen in your logs
 
-    - name: Set up Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '18'
+      - name: Set up Node.js 18
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
 
-    # Cache for node_modules (unchanged, as it's fine)
-    - name: Cache Node.js modules
-      uses: actions/cache@v4
-      with:
-        path: node_modules
-        key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
-        restore-keys: |
-          ${{ runner.os }}-node-
+      - name: Cache Node modules
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          # Use a key that changes if package-lock.json changes
+          key: Linux-node-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            Linux-node- # Fallback to any cache starting with this prefix
 
-    # State files cache - Restore, Run, Save
-    - name: Restore Bot State Cache
-      id: restore-bot-state
-      uses: actions/cache/restore@v4
-      with:
-        path: |
-          last-posted.txt
-          template-indices.json
-        key: ${{ runner.os }}-bot-state-${{ github.run_id }}
-        restore-keys: |
-          ${{ runner.os }}-bot-state-
+      - name: Cache bot state (restore)
+        uses: actions/cache@v4
+        id: restore-bot-state # Add an ID to reference outputs
+        with:
+          path: |
+            last-posted.txt
+            template-indices.json
+          # Use a unique key for the current run for the primary restore attempt.
+          # If this exact key isn't found, restore-keys will be used.
+          key: Linux-bot-state-${{ github.run_id }}
+          restore-keys: |
+            Linux-bot-state- # Crucial: This finds the latest saved state from previous runs
 
-    - name: Install dependencies
-      run: npm install
+      - name: Install dependencies
+        run: npm install
 
-    - name: Run bot script
-      run: node post.js
-      env:
-        YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
-        TWITTER_API_KEY: ${{ secrets.TWITTER_API_KEY }}
-        TWITTER_API_SECRET: ${{ secrets.TWITTER_API_SECRET }}
-        TWITTER_ACCESS_TOKEN: ${{ secrets.TWITTER_ACCESS_TOKEN }}
-        TWITTER_ACCESS_SECRET: ${{ secrets.TWITTER_ACCESS_SECRET }}
+      - name: Run posting script
+        run: node post.js
+        env:
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+          TWITTER_API_KEY: ${{ secrets.TWITTER_API_KEY }}
+          TWITTER_API_SECRET: ${{ secrets.TWITTER_API_SECRET }}
+          TWITTER_ACCESS_TOKEN: ${{ secrets.TWITTER_ACCESS_TOKEN }}
+          TWITTER_ACCESS_SECRET: ${{ secrets.TWITTER_ACCESS_SECRET }}
 
-    - name: Save Bot State Cache
-      uses: actions/cache/save@v4
-      with:
-        path: |
-          last-posted.txt
-          template-indices.json
-        key: ${{ steps.restore-bot-state.outputs.cache-id }} # Corrected key
-      if: success()
+      - name: Cache bot state (save)
+        uses: actions/cache/save@v4
+        # The 'if' condition ensures the cache is saved only if the primary key
+        # wasn't a cache hit (meaning we didn't restore an exact match for this run_id,
+        # which is expected for the *first* save for a run_id),
+        # AND if the run was successful.
+        if: success() && steps.restore-bot-state.outputs.cache-hit != 'true'
+        with:
+          path: |
+            last-posted.txt
+            template-indices.json
+          # Use the same unique key as the restore step to save the updated state
+          key: Linux-bot-state-${{ github.run_id }}
