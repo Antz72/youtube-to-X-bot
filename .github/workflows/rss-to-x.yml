@@ -18,21 +18,21 @@ jobs:
           node-version: '18'
 
       # Step 1: Download the last-posted.txt artifact from the previous run
-      # This step should now always find the file you manually created,
-      # or an artifact from a previous run if one exists.
+      # This will fail on the very first run, but continue-on-error allows the job to proceed.
       - name: Download last posted ID
         uses: actions/download-artifact@v4
         with:
           name: last-posted-id
           path: . # Download to the current directory
+        continue-on-error: true # <--- THIS IS CRUCIAL FOR THE FIRST RUN
 
       - name: Print working directory and list files (for debugging)
         run: |
           echo "Current working directory: $(pwd)"
           echo "Files in this directory:"
           ls -la
-          # Confirm last-posted.txt exists here on subsequent runs
-          cat last-posted.txt || echo "last-posted.txt not found (expected on first run with manual file, or if artifact download failed)"
+          # Confirm last-posted.txt exists here (either from manual commit or downloaded artifact)
+          cat last-posted.txt || echo "last-posted.txt not found (expected if artifact download failed AND no manual file)"
 
 
       - name: Test Twitter API tokens
