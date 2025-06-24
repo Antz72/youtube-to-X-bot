@@ -25,9 +25,17 @@ module.exports = {
         (title, link, hashtagTitle) => `Thought I'd share some thoughts on "${title}" in my newest upload.\n\nIt's a casual chat and some gameplay. Don't miss it! ${link}\n\n#GamingThoughts #YouTube #Community #${hashtagTitle}`
     ],
     upcoming: [
-        // These templates also now accept only title, link, hashtagTitle, formattedTime.
+        // Your existing templates for upcoming videos go here.
         (title, link, hashtagTitle, formattedTime) => `📅 Upcoming! "${title}" is scheduled for ${formattedTime} NZST! Come hang out live: ${link} #LiveStream #${hashtagTitle}`,
         (title, link, hashtagTitle, formattedTime) => `Set your reminders! I'll be live with "${title}" on ${formattedTime} NZST. Join the stream here: ${link} #UpcomingLive #${hashtagTitle}`,
-        // You can add more templates for upcoming videos/streams here.
+        // Add more upcoming templates if you wish
+    ],
+    live: [
+        // NEW: Templates for when a stream is live
+        (title, link, hashtagTitle) => `🔴 LIVE NOW! Join the stream for "${title}"! Come hang out: ${link} #LiveStream #Gaming #${hashtagTitle}`,
+        (title, link, hashtagTitle) => `We are LIVE! Pop in and say hi for "${title}" right now! ${link} #NowLive #GamingCommunity #${hashtagTitle}`,
+        (title, link, hashtagTitle) => `Stream is officially ON! Come join the fun for "${title}" here: ${link} #LiveGaming #YouTubeLive #${hashtagTitle}`, // Note: Changed #Twitch to general #YouTubeLive if it's primarily YouTube
+        (title, link, hashtagTitle) => `What are we getting into today? Find out! I'm LIVE with "${title}"! Join the chaos: ${link} #LiveNow #Playtime #${hashtagTitle}`,
+        (title, link, hashtagTitle) => `The stream has started! Tune in for "${title}" and let's have some fun! ${link} #GoLive #GamingVibes #${hashtagTitle}`
     ]
 };
