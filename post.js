@@ -1,50 +1,68 @@
-const Parser = require('rss-parser');
-const { TwitterApi } = require('twitter-api-v2');
-const fs = require('fs');
+name: Post YouTube Video to X
 
-// IMPORTANT: Ensure this is your correct YouTube Channel ID
-const rssUrl = 'https://www.youtube.com/feeds/videos.xml?channel_id=UC09QwXpdgjgd6l8BFBRlZMw'; 
+on:
+  schedule:
+    - cron: '*/30 * * * *' # Runs every 30 minutes
+  workflow_dispatch: # Allows manual trigger
 
-const lastPostedFile = 'last-posted.txt'; // This file will store the ID of the last posted video
+jobs:
+  post-to-x:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-// Function to get YouTube videos
-async function getYouTubeVideos() {
-    let parser = new Parser();
-    let feed = await parser.parseURL(rssUrl);
-    return feed.items;
-}
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
 
-// Function to post tweet
-async function postTweet(tweetText) {
-    const client = new TwitterApi({
-        appKey: process.env.TWITTER_API_KEY,
-        appSecret: process.env.TWITTER_API_SECRET,
-        accessToken: process.env.TWITTER_ACCESS_TOKEN,
-        accessSecret: process.env.TWITTER_ACCESS_SECRET,
-    });
+      # Download the last-posted.txt artifact from the previous run
+      - name: Download last posted ID
+        uses: actions/download-artifact@v4
+        with:
+          name: last-posted-id
+          path: .
+        continue-on-error: true
 
-    try {
-        await client.v2.tweet(tweetText);
-        console.log('✅ Tweet posted!');
-    } catch (e) {
-        console.error('❌ Error posting tweet:', e);
-        // Do not throw error here, allow the script to finish
-    }
-}
+      # Fallback if artifact AND file missing (first run or error)
+      - name: Ensure last-posted.txt exists
+        run: |
+          if [ ! -f last-posted.txt ]; then
+            echo "last-posted.txt not found, creating a new one"
+            echo "0" > last-posted.txt
+          fi
 
-async function main() {
-    try {
-        const videos = await getYouTubeVideos();
-        if (videos.length === 0) {
-            console.log('No videos found in the RSS feed.');
-            return;
-        }
+      - name: Print working directory and list files (for debugging)
+        run: |
+          echo "Current working directory: $(pwd)"
+          echo "Files in this directory:"
+          ls -la
+          cat last-posted.txt || echo "last-posted.txt not found (unexpected after fallback step)"
 
-        const latestVideo = videos[0];
-        const { id, title, link } = latestVideo;
+      - name: Test Twitter API tokens
+        env:
+          TWITTER_API_KEY: ${{ secrets.TWITTER_API_KEY }}
+          TWITTER_API_SECRET: ${{ secrets.TWITTER_API_SECRET }}
+          TWITTER_ACCESS_TOKEN: ${{ secrets.TWITTER_ACCESS_TOKEN }}
+          TWITTER_ACCESS_SECRET: ${{ secrets.TWITTER_ACCESS_SECRET }}
+        run: node test-tokens.js
 
-        let lastPosted = '';
-        // Check if last-posted.txt exists from artifact download (preferred)
-        if (fs.existsSync(lastPostedFile)) {
-            last
-
+      - name: Install dependencies
+        run: npm install rss-parser twitter-api-v2
+
+      - name: Run script
+        env:
+          TWITTER_API_KEY: ${{ secrets.TWITTER_API_KEY }}
+          TWITTER_API_SECRET: ${{ secrets.TWITTER_API_SECRET }}
+          TWITTER_ACCESS_TOKEN: ${{ secrets.TWITTER_ACCESS_TOKEN }}
+          TWITTER_ACCESS_SECRET: ${{ secrets.TWITTER_ACCESS_SECRET }}
+        run: node post.js
+
+      # Upload the updated last-posted.txt as an artifact for the next run
+      - name: Upload last posted ID
+        uses: actions/upload-artifact@v4
+        with:
+          name: last-posted-id
+          path: last-posted.txt
+          retention-days: 1 # You can adjust retention, 1 day means it's available for the next daily run
