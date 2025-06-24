@@ -1,4 +1,4 @@
-const { TwitterApi } = require('twitter-api-2'); // Note: Changed to twitter-api-2 as twitter-api-v2 is outdated per npm
+const { TwitterApi } = require('twitter-api-v2'); // Note: Changed to twitter-api-2 as twitter-api-v2 is outdated per npm
 const { google } = require('googleapis');
 const fs = require('fs');
 const tweetTemplates = require('./tweet-templates.js');
