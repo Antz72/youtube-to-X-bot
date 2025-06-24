@@ -6,20 +6,20 @@ on:
   # The example below runs every hour.
   schedule:
     - cron: '0 * * * *' # Runs at minute 0 of every hour
-  
+
   # This allows you to manually trigger the workflow from the GitHub UI.
   workflow_dispatch:
 
 jobs:
   post-to-x:
-    runs-on: ubuntu-24.04 # Or 'ubuntu-latest'
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           repository: Antz72/youtube-to-X-bot
-          fetch-depth: 1 # Fetches only the last commit, as seen in your logs
+          fetch-depth: 1
 
       - name: Set up Node.js 18
         uses: actions/setup-node@v4
@@ -30,23 +30,21 @@ jobs:
         uses: actions/cache@v4
         with:
           path: node_modules
-          # Use a key that changes if package-lock.json changes
-          key: Linux-node-${{ hashFiles('package-lock.json') }}
+          key: ${{ runner.os }}-node-${{ hashFiles('package-lock.json') }}
           restore-keys: |
-            Linux-node- # Fallback to any cache starting with this prefix
+            ${{ runner.os }}-node-
 
       - name: Cache bot state (restore)
         uses: actions/cache@v4
-        id: restore-bot-state # Add an ID to reference outputs
+        id: restore-bot-state
         with:
           path: |
             last-posted.txt
             template-indices.json
-          # Use a unique key for the current run for the primary restore attempt.
-          # If this exact key isn't found, restore-keys will be used.
-          key: Linux-bot-state-${{ github.run_id }}
+          # NEW KEY: This uses a stable name + a fingerprint of your code.
+          key: bot-state-${{ hashFiles('post.js', 'package-lock.json') }}
           restore-keys: |
-            Linux-bot-state- # Crucial: This finds the latest saved state from previous runs
+            bot-state-
 
       - name: Install dependencies
         run: npm install
@@ -59,17 +57,16 @@ jobs:
           TWITTER_API_SECRET: ${{ secrets.TWITTER_API_SECRET }}
           TWITTER_ACCESS_TOKEN: ${{ secrets.TWITTER_ACCESS_TOKEN }}
           TWITTER_ACCESS_SECRET: ${{ secrets.TWITTER_ACCESS_SECRET }}
+          # NEW: Control DRY_RUN from here. 'false' means it will tweet live.
+          DRY_RUN_MODE: 'false'
 
       - name: Cache bot state (save)
         uses: actions/cache/save@v4
-        # The 'if' condition ensures the cache is saved only if the primary key
-        # wasn't a cache hit (meaning we didn't restore an exact match for this run_id,
-        # which is expected for the *first* save for a run_id),
-        # AND if the run was successful.
-        if: success() && steps.restore-bot-state.outputs.cache-hit != 'true'
+        # NEW CONDITION: Save the state if the bot ran successfully.
+        if: success()
         with:
           path: |
             last-posted.txt
             template-indices.json
-          # Use the same unique key as the restore step to save the updated state
-          key: Linux-bot-state-${{ github.run_id }}
+          # SAME NEW KEY: This makes sure it updates the correct saved state.
+          key: bot-state-${{ hashFiles('post.js', 'package-lock.json') }}
