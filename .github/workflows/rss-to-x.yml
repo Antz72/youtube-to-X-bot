@@ -18,13 +18,13 @@ jobs:
           node-version: '18'
 
       # Step 1: Download the last-posted.txt artifact from the previous run
-      # This will fail on the very first run, but continue-on-error allows the job to proceed.
+      # This will fail on the very first run of this *workflow*, but continue-on-error allows the job to proceed.
       - name: Download last posted ID
         uses: actions/download-artifact@v4
         with:
           name: last-posted-id
           path: . # Download to the current directory
-        continue-on-error: true # <--- THIS IS CRUCIAL FOR THE FIRST RUN
+        continue-on-error: true # <--- THIS IS CRITICAL AND MUST BE PRESENT
 
       - name: Print working directory and list files (for debugging)
         run: |
