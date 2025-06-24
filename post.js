@@ -1,12 +1,13 @@
 const Parser = require('rss-parser');
 const { TwitterApi } = require('twitter-api-v2');
 const fs = require('fs');
+const tweetTemplates = require('./tweet-templates.js'); // Import the templates
 
 // IMPORTANT: Ensure this is your correct YouTube Channel ID
-// Make sure there are NO extra characters like 'M7' or duplicate quotes.
 const rssUrl = 'https://www.youtube.com/feeds/videos.xml?channel_id=UC09QwXpdgjgd6l8BFBRlZMw'; 
 
 const lastPostedFile = 'last-posted.txt'; // This file will store the ID of the last posted video
+const templateIndexFile = 'template-indices.json'; // New file to store used template indices
 
 // Function to get YouTube videos
 async function getYouTubeVideos() {
@@ -33,6 +34,42 @@ async function postTweet(tweetText) {
     }
 }
 
+// NEW: Function to get a random tweet ensuring no repeats until all are used
+function getCyclingTweet(title, link) {
+    const hashtagTitle = title.replace(/[^a-zA-Z0-9]/g, '').substring(0,20);
+
+    let availableIndices = [];
+    // Try to load available indices from the temporary file (cached)
+    if (fs.existsSync(templateIndexFile)) {
+        try {
+            availableIndices = JSON.parse(fs.readFileSync(templateIndexFile, 'utf-8'));
+            console.log(`Debug: Loaded available template indices: ${availableIndices}`);
+        } catch (e) {
+            console.error('Error parsing template-indices.json, resetting:', e);
+            availableIndices = []; // Fallback if file is corrupted
+        }
+    }
+
+    // If no available indices or corrupted, initialize them
+    if (availableIndices.length === 0) {
+        console.log('Debug: Initializing or resetting all template indices.');
+        availableIndices = Array.from({ length: tweetTemplates.length }, (_, i) => i);
+    }
+
+    // Pick a random index from the available ones
+    const randomArrayIndex = Math.floor(Math.random() * availableIndices.length);
+    const selectedTemplateIndex = availableIndices[randomArrayIndex];
+
+    // Remove the selected index from the available ones
+    availableIndices.splice(randomArrayIndex, 1);
+
+    // Save the updated available indices back to the temporary file
+    fs.writeFileSync(templateIndexFile, JSON.stringify(availableIndices));
+    console.log(`Debug: Remaining template indices: ${availableIndices}`);
+
+    return tweetTemplates[selectedTemplateIndex](title, link, hashtagTitle);
+}
+
 async function main() {
     try {
         const videos = await getYouTubeVideos();
@@ -52,9 +89,6 @@ async function main() {
             console.log(`Debug: Found last-posted.txt (from cache or manual commit). Last posted ID: ${lastPosted}`);
         } else {
             console.log('Debug: last-posted.txt not found. Treating as first run or missing file.');
-            // On a true "first run" for the cache (i.e., no cache entry ever),
-            // or if last-posted.txt was deleted from the repo.
-            // In this scenario, lastPosted remains empty, so the first video from RSS will be posted.
         }
 
         // Extract just the video ID from the YouTube ID format (e.g., 'yt:video:VIDEO_ID')
@@ -62,12 +96,9 @@ async function main() {
 
         if (videoId !== lastPosted) {
             console.log('🎉 New video detected!');
-            // Optimize for engagement: emojis, clear CTA, title-based hashtag, general hashtags.
-            const tweet = `🎬 NEW VIDEO! ${title}\n\n👉 Watch now: ${link}\n\n#YouTube #NewVideo #${title.replace(/[^a-zA-Z0-9]/g, '').substring(0,20)} #Gaming`; // Remember to replace #Gaming with your actual niche!
+            const tweet = getCyclingTweet(title, link); // Use the new cycling tweet generation
             await postTweet(tweet);
 
-            // Update the last-posted.txt file with the new video ID
-            // This file will then be saved to cache for the next run.
             fs.writeFileSync(lastPostedFile, videoId);
             console.log(`Updated last-posted.txt with ID: ${videoId}`);
         } else {
