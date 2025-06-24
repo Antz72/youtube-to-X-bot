@@ -45,7 +45,7 @@ async function getYouTubeVideos() {
 
         const uploadsPlaylistId = channelResponse.data.items[0].contentDetails.relatedPlaylists.uploads;
 
-        // Fetch enough items to find a recent upcoming or published video
+        // Fetch enough items to find a recent upcoming or published video, and also live status
         const playlistItemsResponse = await youtube.playlistItems.list({
             part: 'snippet',
             playlistId: uploadsPlaylistId,
@@ -57,6 +57,7 @@ async function getYouTubeVideos() {
             return null;
         }
 
+        let currentlyLiveVideo = null; // NEW variable for live streams
         let nextUpcomingVideo = null;
         let mostRecentPublishedVideo = null;
         const now = new Date(); // Current time to check against scheduled time
@@ -66,10 +67,26 @@ async function getYouTubeVideos() {
             const liveBroadcastContent = item.snippet.liveBroadcastContent; // 'upcoming', 'live', 'none', 'completed'
             const publishedAt = new Date(item.snippet.publishedAt); // This is the scheduled time for 'upcoming'
 
-            // NOTE: YouTube API's 'publishedAt' for 'upcoming' videos IS the scheduled start time.
-            // For 'none' (normal video) or 'completed' (past live stream), it's the actual publication time.
+            if (liveBroadcastContent === 'live') {
+                // If a video is currently live, fetch its liveStreamingDetails for actual start time
+                const videoDetailsResponse = await youtube.videos.list({
+                    part: 'liveStreamingDetails',
+                    id: videoId,
+                });
 
-            if (liveBroadcastContent === 'upcoming' && publishedAt > now) {
+                const liveDetails = videoDetailsResponse.data.items[0]?.liveStreamingDetails;
+                if (liveDetails && liveDetails.actualStartTime) {
+                    // We found a live video with an actual start time. This is highest priority.
+                    currentlyLiveVideo = {
+                        id: videoId,
+                        title: item.snippet.title,
+                        link: `https://www.youtube.com/watch?v=${videoId}`,
+                        publishedAt: item.snippet.publishedAt, // Still the original publishedAt
+                        type: 'live', // NEW type
+                    };
+                    break; // Found the live one, no need to check others for now
+                }
+            } else if (liveBroadcastContent === 'upcoming' && publishedAt > now) {
                 // If there's an upcoming video and its scheduled time is in the future
                 if (!nextUpcomingVideo || publishedAt < new Date(nextUpcomingVideo.publishedAt)) {
                     // Prioritize the *earliest* upcoming video
@@ -96,12 +113,12 @@ async function getYouTubeVideos() {
             }
         }
 
-        // Prioritize the next upcoming video if found
-        if (nextUpcomingVideo) {
+        // Prioritize: Live > Upcoming > Published
+        if (currentlyLiveVideo) {
+            return currentlyLiveVideo;
+        } else if (nextUpcomingVideo) {
             return nextUpcomingVideo;
-        }
-        // If no upcoming, fall back to the most recent published video
-        else if (mostRecentPublishedVideo) {
+        } else if (mostRecentPublishedVideo) {
             return mostRecentPublishedVideo;
         }
 
@@ -140,7 +157,6 @@ async function postTweet(tweetText) {
 }
 
 // Function to get a random tweet ensuring no repeats until all are used
-// No longer accepts gameTitle parameter
 function getCyclingTweet(title, link, videoType, scheduledTime = '') {
     // Generate a simple hashtag from the title, limiting length
     const hashtagTitle = title.replace(/[^a-zA-Z0-9]/g, '').substring(0, 20);
@@ -178,10 +194,10 @@ function getCyclingTweet(title, link, videoType, scheduledTime = '') {
 
     const templateFn = templatesForType[selectedTemplateIndex];
     if (videoType === 'upcoming') {
-        // Pass only required parameters to upcoming templates
         return templateFn(title, link, hashtagTitle, scheduledTime);
+    } else if (videoType === 'live') { // NEW: Handle 'live' type
+        return templateFn(title, link, hashtagTitle); // 'live' templates don't need formatted time
     } else { // 'published' type
-        // Pass only required parameters to published templates
         return templateFn(title, link, hashtagTitle);
     }
 }
@@ -195,7 +211,8 @@ async function main() {
         }
 
         const { id, title, link, publishedAt, type } = latestVideo;
-        const currentVideoIdentifier = `${id}:${type}`; // Format: VIDEO_ID:TYPE
+        // The identifier now uses the type (published, upcoming, or live)
+        const currentVideoIdentifier = `${id}:${type}`;
 
         let lastPostedIdentifier = '';
         if (fs.existsSync(lastPostedFile)) {
@@ -212,6 +229,8 @@ async function main() {
             if (type === 'upcoming') {
                 const formattedTime = formatTimeForTweet(publishedAt);
                 tweet = getCyclingTweet(title, link, type, formattedTime);
+            } else if (type === 'live') { // NEW: Handle 'live' type
+                tweet = getCyclingTweet(title, link, type);
             } else { // type === 'published'
                 tweet = getCyclingTweet(title, link, type);
             }
