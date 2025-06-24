@@ -1,4 +1,4 @@
-const { TwitterApi } = require('twitter-api-v2'); // Note: Changed to twitter-api-2 as twitter-api-v2 is outdated per npm
+const { TwitterApi } = require('twitter-api-v2');
 const { google } = require('googleapis');
 const fs = require('fs');
 const tweetTemplates = require('./tweet-templates.js');
@@ -9,6 +9,11 @@ const YOUTUBE_API_KEY = process.env.YOUTUBE_API_KEY;
 
 const lastPostedFile = 'last-posted.txt';
 const templateIndexFile = 'template-indices.json';
+
+// --- NEW: DRY RUN MODE ---
+// Set to 'true' to prevent tweets from actually being posted.
+// Set to 'false' when you want to resume live posting.
+const DRY_RUN = true; // <--- Set this to true for debugging!
 
 // --- Initialize YouTube API Client ---
 const youtube = google.youtube({
@@ -111,7 +116,7 @@ async function getYouTubeVideos() {
                 currentlyLiveVideo = {
                     id: videoId,
                     title: videoTitle,
-                    link: `https://youtube.com/watch?v=${videoId}`, // Standard YouTube link
+                    link: `https://www.youtube.com/watch?v=${videoId}`, // Standard YouTube link
                     publishedAt: snippet.publishedAt, // Can use actualStartTime here if needed for specific logic
                     type: 'live',
                 };
@@ -124,9 +129,9 @@ async function getYouTubeVideos() {
                     nextUpcomingVideo = {
                         id: videoId,
                         title: videoTitle,
-                        link: `https://youtube.com/watch?v=${videoId}`, // Standard YouTube link
+                        link: `https://www.youtube.com/watch?v=${videoId}`, // Standard YouTube link
                         publishedAt: liveDetails.scheduledStartTime, // Use scheduledStartTime for upcoming
-                        type: 'upcoming', // Restored to 'upcoming'
+                        type: 'upcoming', // Correct type name
                     };
                     console.log(`  -> Video identified as UPCOMING.`); // New log
                 }
@@ -138,7 +143,7 @@ async function getYouTubeVideos() {
                     mostRecentPublishedVideo = {
                         id: videoId,
                         title: videoTitle,
-                        link: `https://youtube.com/watch?v=${videoId}`, // Standard YouTube link
+                        link: `https://www.youtube.com/watch?v=${videoId}`, // Standard YouTube link
                         publishedAt: snippet.publishedAt,
                         type: 'published',
                     };
@@ -228,7 +233,7 @@ function getCyclingTweet(title, link, videoType, scheduledTime = '') {
     console.log(`Debug: Remaining template indices for ${videoType}: ${currentTypeIndices}`);
 
     const templateFn = templatesForType[selectedTemplateIndex];
-    if (videoType === 'upcoming') { // Restored to 'upcoming'
+    if (videoType === 'upcoming') {
         return templateFn(title, link, hashtagTitle, scheduledTime);
     } else if (videoType === 'live') {
         return templateFn(title, link, hashtagTitle);
@@ -261,7 +266,7 @@ async function main() {
             console.log(`🎉 New ${type} video/stream detected!`);
 
             let tweet;
-            if (type === 'upcoming') { // Restored to 'upcoming'
+            if (type === 'upcoming') {
                 const formattedTime = formatTimeForTweet(publishedAt);
                 tweet = getCyclingTweet(title, link, type, formattedTime);
             } else if (type === 'live') {
@@ -270,10 +275,18 @@ async function main() {
                 tweet = getCyclingTweet(title, link, type);
             }
 
-            await postTweet(tweet);
+            console.log(`Generated Tweet Text for type "${type}":\n${tweet}\n`);
 
-            fs.writeFileSync(lastPostedFile, currentVideoIdentifier);
-            console.log(`Updated last-posted.txt with identifier: ${currentVideoIdentifier}`);
+            // --- Conditionally post tweet based on DRY_RUN flag ---
+            if (DRY_RUN) {
+                console.log('--- DRY RUN MODE: Tweet NOT posted to Twitter. ---');
+            } else {
+                await postTweet(tweet);
+                fs.writeFileSync(lastPostedFile, currentVideoIdentifier);
+                console.log(`Updated last-posted.txt with identifier: ${currentVideoIdentifier}`);
+            }
+            // --- END Conditional post ---
+
         } else {
             console.log(`ℹ️ No new ${type} video or stream to post.`);
         }
