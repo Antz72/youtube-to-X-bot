@@ -321,8 +321,8 @@ async function main() {
 
                 // If in 'repost' mode, revert run_mode.txt to 'true' after posting
                 if (runMode === 'repost') {
-                    fs.writeFileSync(runModeFile, 'true'); // Revert to default dry run mode
-                    console.log(`Reverted ${runModeFile} to 'true' after repost.`);
+                    fs.writeFileSync(runModeFile, 'false'); // Revert to default dry run mode
+                    console.log(`Reverted ${runModeFile} to 'false' after repost.`);
                 }
             }
         }
