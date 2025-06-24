@@ -9,7 +9,7 @@ const YOUTUBE_API_KEY = process.env.YOUTUBE_API_KEY;
 
 const lastPostedFile = 'last-posted.txt';
 const templateIndexFile = 'template-indices.json';
-const dryRunConfigFile = 'dry-run-config.txt'; // Define the path to your new config file
+const runModeFile = 'run_mode.txt'; // Renamed from dryRunConfigFile
 
 // --- Hashtag Configuration ---
 const STATIC_HASHTAGS = ['#Gaming', '#PCGaming', '#NewVideo']; // Your static hashtags
@@ -18,22 +18,6 @@ const CONTEXTUAL_HASHTAGS = {
     'upcoming': '#UpcomingLive',
     'published': '#NewUpload'
 };
-
-// --- DRY RUN MODE ---
-let DRY_RUN = true; // Default to true (safe)
-if (fs.existsSync(dryRunConfigFile)) {
-    try {
-        const dryRunSetting = fs.readFileSync(dryRunConfigFile, 'utf-8').trim().toLowerCase();
-        DRY_RUN = dryRunSetting === 'true';
-    } catch (e) {
-        console.error(`Error reading ${dryRunConfigFile}:`, e.message);
-        console.log('Defaulting DRY_RUN to true due to error.');
-        DRY_RUN = true; // Fallback to safe mode if file read fails
-    }
-} else {
-    console.log(`Warning: ${dryRunConfigFile} not found. Defaulting DRY_RUN to true.`);
-    DRY_RUN = true; // Default to true if file doesn't exist
-}
 
 // --- Initialize YouTube API Client ---
 const youtube = google.youtube({
@@ -74,7 +58,7 @@ async function getYouTubeVideos() {
         const playlistItemsResponse = await youtube.playlistItems.list({
             part: 'snippet', // Still need snippet for title and videoId
             playlistId: uploadsPlaylistId,
-            maxResults: 3, // CHANGED: Now only fetches the 3 most recent videos
+            maxResults: 3, // Now only fetches the 3 most recent videos
         });
 
         if (!playlistItemsResponse.data.items || playlistItemsResponse.data.items.length === 0) {
@@ -269,6 +253,22 @@ function getCyclingTweet(title, link, videoType, scheduledTime = '') {
 }
 
 async function main() {
+    let runMode = 'true'; // Default run mode (dry run)
+    if (fs.existsSync(runModeFile)) {
+        try {
+            runMode = fs.readFileSync(runModeFile, 'utf-8').trim().toLowerCase();
+        } catch (e) {
+            console.error(`Error reading ${runModeFile}:`, e.message);
+            console.log('Defaulting runMode to "true" due to error.');
+            runMode = 'true';
+        }
+    } else {
+        console.log(`Warning: ${runModeFile} not found. Defaulting runMode to "true".`);
+        fs.writeFileSync(runModeFile, 'true'); // Create file with default if not exists
+    }
+    console.log(`Current Run Mode: ${runMode}`);
+
+
     try {
         const latestVideo = await getYouTubeVideos();
         if (!latestVideo) {
@@ -277,7 +277,6 @@ async function main() {
         }
 
         const { id, title, link, publishedAt, type } = latestVideo;
-        // The identifier now uses the type (published, upcoming, or live)
         const currentVideoIdentifier = `${id}:${type}`;
 
         let lastPostedIdentifier = '';
@@ -288,9 +287,19 @@ async function main() {
             console.log('Debug: last-posted.txt not found. Treating as first run or missing file.');
         }
 
-        if (currentVideoIdentifier !== lastPostedIdentifier) {
-            console.log(`🎉 New ${type} video/stream detected!`);
+        let shouldPost = false;
 
+        if (runMode === 'repost') {
+            console.log('--- REPOST MODE: Attempting to repost the last identified video. ---');
+            shouldPost = true; // Force posting
+        } else if (currentVideoIdentifier !== lastPostedIdentifier) {
+            console.log(`🎉 New ${type} video/stream detected!`);
+            shouldPost = true; // Post if new
+        } else {
+            console.log(`ℹ️ No new ${type} video or stream to post.`);
+        }
+
+        if (shouldPost) {
             let tweet;
             if (type === 'upcoming') {
                 const formattedTime = formatTimeForTweet(publishedAt);
@@ -303,18 +312,19 @@ async function main() {
 
             console.log(`Generated Tweet Text for type "${type}":\n${tweet}\n`);
 
-            // --- Conditionally post tweet based on DRY_RUN flag ---
-            if (DRY_RUN) {
+            if (runMode === 'true') { // If it's a 'true' (dry run) mode
                 console.log('--- DRY RUN MODE: Tweet NOT posted to Twitter. ---');
-            } else {
+            } else { // This handles 'false' (normal) and 'repost'
                 await postTweet(tweet);
                 fs.writeFileSync(lastPostedFile, currentVideoIdentifier);
                 console.log(`Updated last-posted.txt with identifier: ${currentVideoIdentifier}`);
-            }
-            // --- END Conditional post ---
 
-        } else {
-            console.log(`ℹ️ No new ${type} video or stream to post.`);
+                // If in 'repost' mode, revert run_mode.txt to 'true' after posting
+                if (runMode === 'repost') {
+                    fs.writeFileSync(runModeFile, 'true'); // Revert to default dry run mode
+                    console.log(`Reverted ${runModeFile} to 'true' after repost.`);
+                }
+            }
         }
     } catch (error) {
         console.error('An error occurred in main:', error);
