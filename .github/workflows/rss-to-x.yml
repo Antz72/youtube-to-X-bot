@@ -17,27 +17,21 @@ jobs:
         with:
           node-version: '18'
 
-      # DIAGNOSTIC STEP: List artifacts before attempting download
-      - name: List artifacts before download
-        run: |
-          gh run view ${{ github.run_id }} --json artifacts | jq '.artifacts[] | .name, .id'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }} # GITHUB_TOKEN is automatically provided
-
-      # Step 1: Download the last-posted.txt artifact from the previous run
-      - name: Download last posted ID
-        uses: actions/download-artifact@v4
+      # Step 1: Restore last-posted.txt from cache
+      - name: Cache last posted ID
+        uses: actions/cache@v4
+        id: cache-last-posted # ID for this step, used to check cache hit/miss
         with:
-          name: last-posted-id
-          path: . # Download to the current directory
-        continue-on-error: true # Keep this for now so the job doesn't stop if it fails
+          path: last-posted.txt
+          key: ${{ runner.os }}-last-posted-id # Cache key. Includes OS to be unique.
 
       - name: Print working directory and list files (for debugging)
         run: |
           echo "Current working directory: $(pwd)"
           echo "Files in this directory:"
           ls -la
-          cat last-posted.txt || echo "last-posted.txt not found (expected if artifact download failed AND no manual file)"
+          # Confirm last-posted.txt exists here (either from cache or manual commit)
+          cat last-posted.txt || echo "last-posted.txt not found (expected if cache miss AND no manual file)"
 
 
       - name: Test Twitter API tokens
@@ -59,17 +53,13 @@ jobs:
           TWITTER_ACCESS_SECRET: ${{ secrets.TWITTER_ACCESS_SECRET }}
         run: node post.js
 
-      # Step 2: Upload the updated last-posted.txt as an artifact for the next run
-      - name: Upload last posted ID
-        uses: actions/upload-artifact@v4
+      # Step 2: Save last-posted.txt to cache for the next run
+      # This step only runs if the cache was not a hit (meaning last-posted.txt was modified or newly created)
+      # or if the cache was a hit and we want to update it.
+      - name: Save last posted ID to cache
+        uses: actions/cache@v4
         with:
-          name: last-posted-id
           path: last-posted.txt
-          retention-days: 1 # Keep retention low for testing
-
-      # DIAGNOSTIC STEP: List artifacts after upload
-      - name: List artifacts after upload
-        run: |
-          gh run view ${{ github.run_id }} --json artifacts | jq '.artifacts[] | .name, .id'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }} # GITHUB_TOKEN is automatically provided
+          key: ${{ runner.os }}-last-posted-id
+          restore-keys: | # Allows re-saving with the same key even if content changed
+            ${{ runner.os }}-last-posted-id
