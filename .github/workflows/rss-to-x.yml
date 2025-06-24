@@ -17,6 +17,13 @@ jobs:
         with:
           node-version: '18'
 
+      # Step 1: Download the last-posted.txt artifact from the previous run
+      - name: Download last posted ID
+        uses: actions/download-artifact@v4
+        with:
+          name: last-posted-id
+          path: . # Download to the current directory
+
       - name: Print working directory and list files (for debugging)
         run: |
           echo "Current working directory: $(pwd)"
@@ -41,3 +48,11 @@ jobs:
           TWITTER_ACCESS_TOKEN: ${{ secrets.TWITTER_ACCESS_TOKEN }}
           TWITTER_ACCESS_SECRET: ${{ secrets.TWITTER_ACCESS_SECRET }}
         run: node post.js
+
+      # Step 2: Upload the updated last-posted.txt as an artifact for the next run
+      - name: Upload last posted ID
+        uses: actions/upload-artifact@v4
+        with:
+          name: last-posted-id
+          path: last-posted.txt
+          retention-days: 1 # You can adjust retention, 1 day means it's available for the next daily run
