@@ -67,6 +67,16 @@ async function getYouTubeVideos() {
             const liveBroadcastContent = item.snippet.liveBroadcastContent; // 'upcoming', 'live', 'none', 'completed'
             const publishedAt = new Date(item.snippet.publishedAt); // This is the scheduled time for 'upcoming'
 
+            // --- ADDED DEBUG LOGGING START ---
+            console.log(`--- Processing Video: ${item.snippet.title} (ID: ${videoId}) ---`);
+            console.log(`  liveBroadcastContent: ${liveBroadcastContent}`);
+            console.log(`  publishedAt (ISO): ${item.snippet.publishedAt}`);
+            console.log(`  publishedAt (Date object): ${publishedAt}`);
+            console.log(`  Current time (Date object): ${now}`);
+            console.log(`  Is publishedAt in future? ${publishedAt > now}`);
+            // --- ADDED DEBUG LOGGING END ---
+
+
             if (liveBroadcastContent === 'live') {
                 // If a video is currently live, fetch its liveStreamingDetails for actual start time
                 const videoDetailsResponse = await youtube.videos.list({
@@ -75,12 +85,18 @@ async function getYouTubeVideos() {
                 });
 
                 const liveDetails = videoDetailsResponse.data.items[0]?.liveStreamingDetails;
+                if (liveDetails) {
+                    console.log(`  Live Streaming Details:`);
+                    console.log(`    actualStartTime: ${liveDetails.actualStartTime || 'N/A'}`);
+                    console.log(`    scheduledStartTime: ${liveDetails.scheduledStartTime || 'N/A'}`);
+                }
+
                 if (liveDetails && liveDetails.actualStartTime) {
                     // We found a live video with an actual start time. This is highest priority.
                     currentlyLiveVideo = {
                         id: videoId,
                         title: item.snippet.title,
-                        link: `https://www.youtube.com/watch?v=${videoId}`,
+                        link: `https://youtube.com/watch?v=${videoId}`, // Corrected link format
                         publishedAt: item.snippet.publishedAt, // Still the original publishedAt
                         type: 'live', // NEW type
                     };
@@ -93,7 +109,7 @@ async function getYouTubeVideos() {
                     nextUpcomingVideo = {
                         id: videoId,
                         title: item.snippet.title,
-                        link: `https://www.youtube.com/watch?v=${videoId}`,
+                        link: `https://youtube.com/watch?v=${videoId}`, // Corrected link format
                         publishedAt: item.snippet.publishedAt, // Keep original ISO string for formatting
                         type: 'upcoming',
                     };
@@ -105,7 +121,7 @@ async function getYouTubeVideos() {
                     mostRecentPublishedVideo = {
                         id: videoId,
                         title: item.snippet.title,
-                        link: `https://www.youtube.com/watch?v=${videoId}`,
+                        link: `https://youtube.com/watch?v=${videoId}`, // Corrected link format
                         publishedAt: item.snippet.publishedAt,
                         type: 'published',
                     };
@@ -115,10 +131,13 @@ async function getYouTubeVideos() {
 
         // Prioritize: Live > Upcoming > Published
         if (currentlyLiveVideo) {
+            console.log(`Debug: Selected Live Video: ${currentlyLiveVideo.title}`);
             return currentlyLiveVideo;
         } else if (nextUpcomingVideo) {
+            console.log(`Debug: Selected Upcoming Video: ${nextUpcomingVideo.title}`);
             return nextUpcomingVideo;
         } else if (mostRecentPublishedVideo) {
+            console.log(`Debug: Selected Published Video: ${mostRecentPublishedVideo.title}`);
             return mostRecentPublishedVideo;
         }
 
