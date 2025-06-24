@@ -10,7 +10,7 @@ const YOUTUBE_API_KEY = process.env.YOUTUBE_API_KEY;
 const lastPostedFile = 'last-posted.txt';
 const templateIndexFile = 'template-indices.json';
 
-// --- NEW: DRY RUN MODE ---
+// --- DRY RUN MODE ---
 // Set to 'true' to prevent tweets from actually being posted.
 // Set to 'false' when you want to resume live posting.
 const DRY_RUN = true; // <--- Set this to true for debugging!
@@ -91,7 +91,7 @@ async function getYouTubeVideos() {
 
             const snippet = videoDetails.snippet;
             const liveDetails = videoDetails.liveStreamingDetails;
-            const publishedAt = new Date(snippet.publishedAt); // This is the actual publish date for regular videos, or scheduled for streams
+            const publishedAt = new Date(snippet.publishedAt); // This is the actual publish date for regular videos, or initial upload for streams
 
             // --- DEBUG LOGGING START ---
             console.log(`  PublishedAt from video details: ${snippet.publishedAt}`);
@@ -101,6 +101,7 @@ async function getYouTubeVideos() {
             if (liveDetails) {
                 console.log(`  Live Streaming Details found: Yes`);
                 console.log(`    liveDetails.actualStartTime: ${liveDetails.actualStartTime || 'N/A'}`);
+                console.log(`    liveDetails.actualEndTime: ${liveDetails.actualEndTime || 'N/A'}`); // NEW LOG
                 console.log(`    liveDetails.scheduledStartTime: ${liveDetails.scheduledStartTime || 'N/A'}`);
                 console.log(`    Is scheduledStartTime in future? ${liveDetails.scheduledStartTime && new Date(liveDetails.scheduledStartTime) > now}`);
             } else {
@@ -110,44 +111,46 @@ async function getYouTubeVideos() {
 
 
             // --- Determine video type based on comprehensive details and strict priority ---
-            if (liveDetails && liveDetails.actualStartTime) {
-                // If actualStartTime exists, the stream IS live or has completed recently.
-                // This takes highest priority.
+            if (liveDetails && liveDetails.actualStartTime && !liveDetails.actualEndTime) {
+                // Condition 1: Video is CURRENTLY LIVE (actual start time exists, but no actual end time yet)
                 currentlyLiveVideo = {
                     id: videoId,
                     title: videoTitle,
-                    link: `https://www.youtube.com/watch?v=${videoId}`, // Standard YouTube link
-                    publishedAt: snippet.publishedAt, // Can use actualStartTime here if needed for specific logic
+                    link: `https://www.youtube.com/watch?v=$${videoId}`, // Standard YouTube link
+                    publishedAt: snippet.publishedAt, // Use video's publishedAt or actualStartTime if preferred for sorting
                     type: 'live',
                 };
-                console.log(`  -> Video identified as LIVE.`); // New log
+                console.log(`  -> Video identified as CURRENTLY LIVE.`);
                 break; // Found the live one, no need to check others for now
             } else if (liveDetails && liveDetails.scheduledStartTime && new Date(liveDetails.scheduledStartTime) > now) {
-                // If scheduledStartTime exists and is in the future, it's an UPCOMING stream.
+                // Condition 2: Video is UPCOMING (scheduled start time exists and is in the future)
                 if (!nextUpcomingVideo || new Date(liveDetails.scheduledStartTime) < new Date(nextUpcomingVideo.publishedAt)) {
                     // Prioritize the *earliest* upcoming video by its scheduled time
                     nextUpcomingVideo = {
                         id: videoId,
                         title: videoTitle,
-                        link: `https://www.youtube.com/watch?v=${videoId}`, // Standard YouTube link
+                        link: `https://www.youtube.com/watch?v=$${videoId}`, // Standard YouTube link
                         publishedAt: liveDetails.scheduledStartTime, // Use scheduledStartTime for upcoming
-                        type: 'upcoming', // Correct type name
+                        type: 'upcoming',
                     };
-                    console.log(`  -> Video identified as UPCOMING.`); // New log
+                    console.log(`  -> Video identified as UPCOMING.`);
                 }
             } else {
-                // If it's neither live (via actualStartTime) nor upcoming (via future scheduledStartTime), it's published.
-                // This covers regular uploads and completed live streams (VODs).
+                // Condition 3: Video is PUBLISHED (this covers regular uploads AND completed live streams)
+                // This block is reached if:
+                //   - No liveStreamingDetails are present (a regular video upload).
+                //   - liveStreamingDetails are present, but the stream has completed (actualEndTime exists).
+                //   - liveStreamingDetails are present, but the scheduledStartTime is in the past (missed stream, now a VOD).
                 if (!mostRecentPublishedVideo || publishedAt > new Date(mostRecentPublishedVideo.publishedAt)) {
                     // Prioritize the *most recent* published video
                     mostRecentPublishedVideo = {
                         id: videoId,
                         title: videoTitle,
-                        link: `https://www.youtube.com/watch?v=${videoId}`, // Standard YouTube link
+                        link: `https://www.youtube.com/watch?v=$${videoId}`, // Standard YouTube link
                         publishedAt: snippet.publishedAt,
                         type: 'published',
                     };
-                    console.log(`  -> Video identified as PUBLISHED.`); // New log
+                    console.log(`  -> Video identified as PUBLISHED (regular upload or completed stream).`);
                 }
             }
         }
