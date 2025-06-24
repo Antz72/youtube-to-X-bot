@@ -3,7 +3,7 @@ const { TwitterApi } = require('twitter-api-v2');
 const fs = require('fs');
 
 // IMPORTANT: Ensure this is your correct YouTube Channel ID
-const rssUrl = 'https://www.youtube.com/feeds/videos.xml?channel_id=UC09QwXpdgjgd6l8BFBRlZMw'; 
+const rssUrl = 'https://www.youtube.com/feeds/videos.xml?channel_id=UC09QwXpdgjgd6l8BFBRlZMw';'; 
 
 const lastPostedFile = 'last-posted.txt'; // This file will store the ID of the last posted video
 
@@ -44,21 +44,19 @@ async function main() {
         const { id, title, link } = latestVideo;
 
         let lastPosted = '';
-        // Check if last-posted.txt exists from artifact download (preferred)
+        // --- START OF MODIFIED BLOCK ---
+        // With actions/cache, lastPostedFile will be present if cached successfully
+        // If not cached, it will fall back to the manually committed file.
         if (fs.existsSync(lastPostedFile)) {
             lastPosted = fs.readFileSync(lastPostedFile, 'utf-8').trim();
-            console.log(`Debug: Found last-posted.txt from artifact/working directory. Last posted ID: ${lastPosted}`);
+            console.log(`Debug: Found last-posted.txt (from cache or manual commit). Last posted ID: ${lastPosted}`);
         } else {
-            // If artifact was not downloaded, try to use the manually committed file in the root
-            // This happens on the very first run, or if the artifact somehow gets deleted.
-            const manualLastPostedPath = './last-posted.txt'; 
-            if (fs.existsSync(manualLastPostedPath)) {
-                lastPosted = fs.readFileSync(manualLastPostedPath, 'utf-8').trim();
-                console.log(`Debug: Artifact not found, using manually committed last-posted.txt. Last posted ID: ${lastPosted}`);
-            } else {
-                console.log('Debug: No last-posted.txt found (neither from artifact nor manual commit). Treating as first run.');
-            }
+            console.log('Debug: last-posted.txt not found. Treating as first run or missing file.');
+            // On a true "first run" for the cache (i.e., no cache entry ever),
+            // or if last-posted.txt was deleted from the repo.
+            // In this scenario, lastPosted remains empty, so the first video from RSS will be posted.
         }
+        // --- END OF MODIFIED BLOCK ---
 
         // Extract just the video ID from the YouTube ID format (e.g., 'yt:video:VIDEO_ID')
         const videoId = id.replace('yt:video:', '');
@@ -70,7 +68,7 @@ async function main() {
             await postTweet(tweet);
 
             // Update the last-posted.txt file with the new video ID
-            // This file will then be uploaded as an artifact for the next run.
+            // This file will then be saved to cache for the next run.
             fs.writeFileSync(lastPostedFile, videoId);
             console.log(`Updated last-posted.txt with ID: ${videoId}`);
         } else {
