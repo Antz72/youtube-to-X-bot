@@ -3,7 +3,8 @@ const { TwitterApi } = require('twitter-api-v2');
 const fs = require('fs');
 
 // IMPORTANT: Ensure this is your correct YouTube Channel ID
-const rssUrl = 'https://www.youtube.com/feeds/videos.xml?channel_id=UC09QwXpdgjgd6l8BFBRlZMw';'; 
+// Make sure there are NO extra characters like 'M7' or duplicate quotes.
+const rssUrl = 'https://www.youtube.com/feeds/videos.xml?channel_id=UC09QwXpdgjgd6l8BFBRlZMw'; 
 
 const lastPostedFile = 'last-posted.txt'; // This file will store the ID of the last posted video
 
@@ -44,7 +45,6 @@ async function main() {
         const { id, title, link } = latestVideo;
 
         let lastPosted = '';
-        // --- START OF MODIFIED BLOCK ---
         // With actions/cache, lastPostedFile will be present if cached successfully
         // If not cached, it will fall back to the manually committed file.
         if (fs.existsSync(lastPostedFile)) {
@@ -56,7 +56,6 @@ async function main() {
             // or if last-posted.txt was deleted from the repo.
             // In this scenario, lastPosted remains empty, so the first video from RSS will be posted.
         }
-        // --- END OF MODIFIED BLOCK ---
 
         // Extract just the video ID from the YouTube ID format (e.g., 'yt:video:VIDEO_ID')
         const videoId = id.replace('yt:video:', '');
