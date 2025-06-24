@@ -1,6 +1,6 @@
 const { TwitterApi } = require('twitter-api-v2');
 const { google } = require('googleapis');
-const fs = require('fs');
+const fs = require('fs'); // Keep this one at the top
 const tweetTemplates = require('./tweet-templates.js');
 
 // --- Configuration ---
@@ -9,13 +9,6 @@ const YOUTUBE_API_KEY = process.env.YOUTUBE_API_KEY;
 
 const lastPostedFile = 'last-posted.txt';
 const templateIndexFile = 'template-indices.json';
-
-// --- DRY RUN MODE ---
-
-const fs = require('fs'); // Make sure fs is at the top, which it already is.
-
-// --- Configuration ---
-// ... (rest of your configuration) ...
 const dryRunConfigFile = 'dry-run-config.txt'; // Define the path to your new config file
 
 // --- DRY RUN MODE ---
@@ -33,7 +26,6 @@ if (fs.existsSync(dryRunConfigFile)) {
     console.log(`Warning: ${dryRunConfigFile} not found. Defaulting DRY_RUN to true.`);
     DRY_RUN = true; // Default to true if file doesn't exist
 }
-
 
 // --- Initialize YouTube API Client ---
 const youtube = google.youtube({
