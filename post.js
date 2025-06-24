@@ -46,35 +46,5 @@ async function main() {
         let lastPosted = '';
         // Check if last-posted.txt exists from artifact download (preferred)
         if (fs.existsSync(lastPostedFile)) {
-            lastPosted = fs.readFileSync(lastPostedFile, 'utf-8').trim();
-            console.log(`Debug: Found last-posted.txt from artifact/working directory. Last posted ID: ${lastPosted}`);
-        } else {
-            // If artifact was not downloaded, try to use the manually committed file in the root
-            // This happens on the very first run, or if the artifact somehow gets deleted.
-            const manualLastPostedPath = './last-posted.txt'; 
-            if (fs.existsSync(manualLastPostedPath)) {
-                lastPosted = fs.readFileSync(manualLastPostedPath, 'utf-8').trim();
-                console.log(`Debug: Artifact not found, using manually committed last-posted.txt. Last posted ID: ${lastPosted}`);
-            } else {
-                console.log('Debug: No last-posted.txt found (neither from artifact nor manual commit). Treating as first run.');
-            }
-        }
-
-        // Extract just the video ID from the YouTube ID format (e.g., 'yt:video:VIDEO_ID')
-        const videoId = id.replace('yt:video:', '');
-
-        if (videoId !== lastPosted) {
-            console.log('🎉 New video detected!');
-            // Optimize for engagement: emojis, clear CTA, title-based hashtag, general hashtags.
-            const tweet = `🎬 NEW VIDEO! ${title}\n\n👉 Watch now: ${link}\n\n#YouTube #NewVideo #${title.replace(/[^a-zA-Z0-9]/g, '').substring(0,20)} #Gaming`; // Remember to replace #Gaming with your actual niche!
-            await postTweet(tweet);
-
-            // Update the last-posted.txt file with the new video ID
-            // This file will then be uploaded as an artifact for the next run.
-            fs.writeFileSync(lastPostedFile, videoId);
-            console.log(`Updated last-posted.txt with ID: ${videoId}`);
-        } else {
-            console.log('ℹ️ No new video to post.');
-        }
-    } catch (error) {
-        console.error('An error
+            last
+
