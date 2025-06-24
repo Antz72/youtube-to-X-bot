@@ -4,7 +4,7 @@ on:
   schedule:
     # Run every 10 minutes (adjust this cron schedule if you want it more or less frequent)
     # The cron string '*/10 * * * *' means "at every 10th minute".
-    - cron: '*/10 * * * *'
+    - cron: '*/30 * * * *'
   workflow_dispatch: # Allows you to manually trigger the workflow from the GitHub Actions tab
 
 jobs:
