@@ -2,26 +2,23 @@ name: Post New YouTube Videos to X
 
 on:
   schedule:
-    # Run every 30 minutes (adjust this cron schedule if you want it more or less frequent)
-    # The cron string '*/30 * * * *' means "at every 30th minute".
-    - cron: '*/30 * * * *'
-  workflow_dispatch: # Allows you to manually trigger the workflow from the GitHub Actions tab
+    - cron: '*/30 * * * *' # Runs every 30 minutes
+  workflow_dispatch: # Allows manual trigger from GitHub UI
 
 jobs:
   post-to-x:
-    runs-on: ubuntu-latest # Uses the latest Ubuntu Linux environment
+    runs-on: ubuntu-latest
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v4 # Gets your code from the repository
+      uses: actions/checkout@v4
 
     - name: Set up Node.js
-      uses: actions/setup-node@v4 # Installs Node.js
+      uses: actions/setup-node@v4
       with:
-        node-version: '18' # Specifies Node.js version 18
+        node-version: '18'
 
-    # Old 'Cache Node.js modules and bot data' step is being replaced/split
-
+    # Cache for node_modules (unchanged, as it's fine)
     - name: Cache Node.js modules
       uses: actions/cache@v4
       with:
@@ -30,26 +27,36 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-node-
 
-    - name: Cache Bot State Files
-      uses: actions/cache@v4
+    # NEW: Step 1 of 3 for state files - Restore
+    - name: Restore Bot State Cache
+      id: restore-bot-state # Give this step an ID to reference its output
+      uses: actions/cache/restore@v4 # Use the specific 'restore' action
       with:
         path: |
           last-posted.txt
           template-indices.json
-        key: ${{ runner.os }}-bot-state-${{ github.run_id }} # Unique key for saving this run's state
+        key: ${{ runner.os }}-bot-state-${{ github.run_id }} # Unique key for this run's potential save
         restore-keys: |
-          ${{ runner.os }}-bot-state- # Restore from the latest state cache
-        save-always: true # Crucial: Ensures changes to these files are saved back to the cache
+          ${{ runner.os }}-bot-state- # Search for previous states
 
     - name: Install dependencies
-      run: npm install # This command reads your package.json and installs googleapis and twitter-api-v2
+      run: npm install
 
     - name: Run bot script
-      run: node post.js # Executes your main bot script
+      run: node post.js
       env:
-        # These are your environment variables (secrets) that the script needs
         YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
         TWITTER_API_KEY: ${{ secrets.TWITTER_API_KEY }}
         TWITTER_API_SECRET: ${{ secrets.TWITTER_API_SECRET }}
         TWITTER_ACCESS_TOKEN: ${{ secrets.TWITTER_ACCESS_TOKEN }}
         TWITTER_ACCESS_SECRET: ${{ secrets.TWITTER_ACCESS_SECRET }}
+
+    # NEW: Step 2 of 3 for state files - Save
+    - name: Save Bot State Cache
+      uses: actions/cache/save@v4 # Use the specific 'save' action
+      with:
+        path: |
+          last-posted.txt
+          template-indices.json
+        key: ${{ steps.restore-bot-state.outputs.cache-primary-key }} # Use the key from the restore step
+      if: success() # Only save if the previous steps were successful (optional, but good practice)
