@@ -1,81 +1,65 @@
-const Parser = require('rss-parser');
-const { TwitterApi } = require('twitter-api-v2');
-const fs = require('fs');
+name: Post YouTube Video to X
 
-// IMPORTANT: Ensure this is your correct YouTube Channel ID
-// Make sure there are NO extra characters like 'M7' or duplicate quotes.
-const rssUrl = 'https://www.youtube.com/feeds/videos.xml?channel_id=UC09QwXpdgjgd6l8BFBRlZMw'; 
+on:
+  schedule:
+    - cron: '*/30 * * * *' # Runs every 30 minutes
+  workflow_dispatch: # Allows manual trigger
 
-const lastPostedFile = 'last-posted.txt'; // This file will store the ID of the last posted video
+jobs:
+  post-to-x:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-// Function to get YouTube videos
-async function getYouTubeVideos() {
-    let parser = new Parser();
-    let feed = await parser.parseURL(rssUrl);
-    return feed.items;
-}
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
 
-// Function to post tweet
-async function postTweet(tweetText) {
-    const client = new TwitterApi({
-        appKey: process.env.TWITTER_API_KEY,
-        appSecret: process.env.TWITTER_API_SECRET,
-        accessToken: process.env.TWITTER_ACCESS_TOKEN,
-        accessSecret: process.env.TWITTER_ACCESS_SECRET,
-    });
+      # Step 1: Restore last-posted.txt from cache
+      - name: Cache last posted ID
+        uses: actions/cache@v4
+        id: cache-last-posted # ID for this step, used to check cache hit/miss
+        with:
+          path: last-posted.txt
+          key: ${{ runner.os }}-last-posted-id # Cache key. Includes OS to be unique.
 
-    try {
-        await client.v2.tweet(tweetText);
-        console.log('✅ Tweet posted!');
-    } catch (e) {
-        console.error('❌ Error posting tweet:', e);
-        // Do not throw error here, allow the script to finish
-    }
-}
+      - name: Print working directory and list files (for debugging)
+        run: |
+          echo "Current working directory: $(pwd)"
+          echo "Files in this directory:"
+          ls -la
+          # Confirm last-posted.txt exists here (either from cache or manual commit)
+          cat last-posted.txt || echo "last-posted.txt not found (expected if cache miss AND no manual file)"
 
-async function main() {
-    try {
-        const videos = await getYouTubeVideos();
-        if (videos.length === 0) {
-            console.log('No videos found in the RSS feed.');
-            return;
-        }
 
-        const latestVideo = videos[0];
-        const { id, title, link } = latestVideo;
+      - name: Test Twitter API tokens
+        env:
+          TWITTER_API_KEY: ${{ secrets.TWITTER_API_KEY }}
+          TWITTER_API_SECRET: ${{ secrets.TWITTER_API_SECRET }}
+          TWITTER_ACCESS_TOKEN: ${{ secrets.TWITTER_ACCESS_TOKEN }}
+          TWITTER_ACCESS_SECRET: ${{ secrets.TWITTER_ACCESS_SECRET }}
+        run: node test-tokens.js
 
-        let lastPosted = '';
-        // With actions/cache, lastPostedFile will be present if cached successfully
-        // If not cached, it will fall back to the manually committed file.
-        if (fs.existsSync(lastPostedFile)) {
-            lastPosted = fs.readFileSync(lastPostedFile, 'utf-8').trim();
-            console.log(`Debug: Found last-posted.txt (from cache or manual commit). Last posted ID: ${lastPosted}`);
-        } else {
-            console.log('Debug: last-posted.txt not found. Treating as first run or missing file.');
-            // On a true "first run" for the cache (i.e., no cache entry ever),
-            // or if last-posted.txt was deleted from the repo.
-            // In this scenario, lastPosted remains empty, so the first video from RSS will be posted.
-        }
+      - name: Install dependencies
+        run: npm install rss-parser twitter-api-v2
 
-        // Extract just the video ID from the YouTube ID format (e.g., 'yt:video:VIDEO_ID')
-        const videoId = id.replace('yt:video:', '');
+      - name: Run script
+        env:
+          TWITTER_API_KEY: ${{ secrets.TWITTER_API_KEY }}
+          TWITTER_API_SECRET: ${{ secrets.TWITTER_API_SECRET }}
+          TWITTER_ACCESS_TOKEN: ${{ secrets.TWITTER_ACCESS_TOKEN }}
+          TWITTER_ACCESS_SECRET: ${{ secrets.TWITTER_ACCESS_SECRET }}
+        run: node post.js
 
-        if (videoId !== lastPosted) {
-            console.log('🎉 New video detected!');
-            // Optimize for engagement: emojis, clear CTA, title-based hashtag, general hashtags.
-            const tweet = `🎬 NEW VIDEO! ${title}\n\n👉 Watch now: ${link}\n\n#YouTube #NewVideo #${title.replace(/[^a-zA-Z0-9]/g, '').substring(0,20)} #Gaming`; // Remember to replace #Gaming with your actual niche!
-            await postTweet(tweet);
-
-            // Update the last-posted.txt file with the new video ID
-            // This file will then be saved to cache for the next run.
-            fs.writeFileSync(lastPostedFile, videoId);
-            console.log(`Updated last-posted.txt with ID: ${videoId}`);
-        } else {
-            console.log('ℹ️ No new video to post.');
-        }
-    } catch (error) {
-        console.error('An error occurred:', error);
-    }
-}
-
-main();
+      # Step 2: Save last-posted.txt to cache for the next run
+      # This step only runs if the cache was not a hit (meaning last-posted.txt was modified or newly created)
+      # or if the cache was a hit and we want to update it.
+      - name: Save last posted ID to cache
+        uses: actions/cache@v4
+        with:
+          path: last-posted.txt
+          key: ${{ runner.os }}-last-posted-id
+          restore-keys: | # Allows re-saving with the same key even if content changed
+            ${{ runner.os }}-last-posted-id
