@@ -13,7 +13,7 @@ const templateIndexFile = 'template-indices.json';
 // --- DRY RUN MODE ---
 // Set to 'true' to prevent tweets from actually being posted.
 // Set to 'false' when you want to resume live posting.
-const DRY_RUN = true; // <--- Set this to true for debugging!
+const DRY_RUN = process.env.DRY_RUN_MODE === 'true'; // Reads from environment variable
 
 // --- Initialize YouTube API Client ---
 const youtube = google.youtube({
