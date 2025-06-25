@@ -2,9 +2,10 @@ const { TwitterApi } = require('twitter-api-v2');
 const { google } = require('googleapis');
 const fs = require('fs');
 const tweetTemplates = require('./tweet-templates.js');
+const config = require('./config.js');
 
 // --- Configuration ---
-const YOUTUBE_CHANNEL_ID = 'UC09QwXpdgjgd6l8BFBRlZMw'; // Your actual channel ID
+const YOUTUBE_CHANNEL_ID = config.YOUTUBE_CHANNEL_ID;
 const YOUTUBE_API_KEY = process.env.YOUTUBE_API_KEY;
 
 const lastPostedFile = 'last-posted.txt';
@@ -12,7 +13,7 @@ const templateIndexFile = 'template-indices.json';
 const runModeFile = 'run-mode.txt';
 
 // --- Hashtag Configuration ---
-const STATIC_HASHTAGS = ['#Gaming', '#PCGaming', '#NewVideo'];
+const STATIC_HASHTAGS = config.STATIC_HASHTAGS;
 const CONTEXTUAL_HASHTAGS = {
     'live': '#LiveStream',
     'upcoming': '#UpcomingLive',
@@ -56,7 +57,7 @@ async function getYouTubeVideos() {
         const playlistItemsResponse = await youtube.playlistItems.list({
             part: 'snippet',
             playlistId: uploadsPlaylistId,
-            maxResults: 3,
+            maxResults: config.MAX_YOUTUBE_RESULTS,
         });
 
         if (!playlistItemsResponse.data.items || playlistItemsResponse.data.items.length === 0) {
