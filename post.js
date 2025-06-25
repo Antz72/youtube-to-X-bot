@@ -2,18 +2,15 @@ const { TwitterApi } = require('twitter-api-v2');
 const { google } = require('googleapis');
 const fs = require('fs');
 const tweetTemplates = require('./tweet-templates.js');
-const config = require('./config.js');
+const config = require('./config.js'); // Import the new config file
 
-// --- Configuration ---
-const YOUTUBE_CHANNEL_ID = config.YOUTUBE_CHANNEL_ID;
-const YOUTUBE_API_KEY = process.env.YOUTUBE_API_KEY;
-
+// --- State and Run Mode Files ---
 const lastPostedFile = 'last-posted.txt';
 const templateIndexFile = 'template-indices.json';
 const runModeFile = 'run-mode.txt';
 
 // --- Hashtag Configuration ---
-const STATIC_HASHTAGS = config.STATIC_HASHTAGS;
+// Note: STATIC_HASHTAGS now comes from config.js
 const CONTEXTUAL_HASHTAGS = {
     'live': '#LiveStream',
     'upcoming': '#UpcomingLive',
@@ -23,10 +20,11 @@ const CONTEXTUAL_HASHTAGS = {
 // --- Initialize YouTube API Client ---
 const youtube = google.youtube({
     version: 'v3',
-    auth: YOUTUBE_API_KEY,
+    auth: process.env.YOUTUBE_API_KEY, // API key from environment variables
 });
 
-// --- Utility function for time formatting ---
+// --- Utility Functions ---
+
 function formatTimeForTweet(isoDateString) {
     const date = new Date(isoDateString);
     return date.toLocaleString('en-NZ', {
@@ -39,16 +37,37 @@ function formatTimeForTweet(isoDateString) {
     });
 }
 
-// --- Function to get YouTube videos via API ---
+// Helper function to create a consistent video object
+function createVideoObject(videoDetails, typeOverride = null) {
+    const { id } = videoDetails;
+    const { title, publishedAt } = videoDetails.snippet;
+    const videoType = typeOverride || 'published';
+
+    let timestamp = publishedAt;
+    if (videoType === 'upcoming' && videoDetails.liveStreamingDetails) {
+        timestamp = videoDetails.liveStreamingDetails.scheduledStartTime;
+    }
+
+    return {
+        id,
+        title,
+        link: `https://www.youtube.com/watch?v=${id}`,
+        publishedAt: timestamp,
+        type: videoType,
+    };
+}
+
+// --- Core Functions ---
+
 async function getYouTubeVideos() {
     try {
         const channelResponse = await youtube.channels.list({
             part: 'contentDetails',
-            id: YOUTUBE_CHANNEL_ID,
+            id: config.YOUTUBE_CHANNEL_ID,
         });
 
         if (!channelResponse.data.items || channelResponse.data.items.length === 0) {
-            console.error('Error: Could not find channel with ID:', YOUTUBE_CHANNEL_ID);
+            console.error('Error: Could not find channel with ID:', config.YOUTUBE_CHANNEL_ID);
             return null;
         }
 
@@ -57,7 +76,7 @@ async function getYouTubeVideos() {
         const playlistItemsResponse = await youtube.playlistItems.list({
             part: 'snippet',
             playlistId: uploadsPlaylistId,
-            maxResults: config.MAX_YOUTUBE_RESULTS,
+            maxResults: config.MAX_YOUTUBE_RESULTS, // Using value from config file
         });
 
         if (!playlistItemsResponse.data.items || playlistItemsResponse.data.items.length === 0) {
@@ -72,8 +91,6 @@ async function getYouTubeVideos() {
 
         for (const item of playlistItemsResponse.data.items) {
             const videoId = item.snippet.resourceId.videoId;
-            const videoTitle = item.snippet.title;
-
             const videoDetailsResponse = await youtube.videos.list({
                 part: 'snippet,liveStreamingDetails',
                 id: videoId,
@@ -82,20 +99,24 @@ async function getYouTubeVideos() {
             const videoDetails = videoDetailsResponse.data.items[0];
             if (!videoDetails) continue;
 
-            const snippet = videoDetails.snippet;
-            const liveDetails = videoDetails.liveStreamingDetails;
-            const publishedAt = new Date(snippet.publishedAt);
+            const { snippet, liveStreamingDetails: liveDetails } = videoDetails;
 
+            // Using the new helper function to create video objects
             if (liveDetails && liveDetails.actualStartTime && !liveDetails.actualEndTime) {
-                currentlyLiveVideo = { id: videoId, title: videoTitle, link: `https://www.youtube.com/watch?v=${videoId}`, publishedAt: snippet.publishedAt, type: 'live' };
+                currentlyLiveVideo = createVideoObject(videoDetails, 'live');
+                console.log(`-> Video identified as CURRENTLY LIVE: ${currentlyLiveVideo.title}`);
                 break;
             } else if (liveDetails && liveDetails.scheduledStartTime && new Date(liveDetails.scheduledStartTime) > now) {
-                if (!nextUpcomingVideo || new Date(liveDetails.scheduledStartTime) < new Date(nextUpcomingVideo.publishedAt)) {
-                    nextUpcomingVideo = { id: videoId, title: videoTitle, link: `https://www.youtube.com/watch?v=${videoId}`, publishedAt: liveDetails.scheduledStartTime, type: 'upcoming' };
+                const upcomingVideo = createVideoObject(videoDetails, 'upcoming');
+                if (!nextUpcomingVideo || new Date(upcomingVideo.publishedAt) < new Date(nextUpcomingVideo.publishedAt)) {
+                    nextUpcomingVideo = upcomingVideo;
+                    console.log(`-> Video identified as UPCOMING: ${nextUpcomingVideo.title}`);
                 }
             } else {
-                if (!mostRecentPublishedVideo || publishedAt > new Date(mostRecentPublishedVideo.publishedAt)) {
-                    mostRecentPublishedVideo = { id: videoId, title: videoTitle, link: `https://www.youtube.com/watch?v=${videoId}`, publishedAt: snippet.publishedAt, type: 'published' };
+                const publishedVideo = createVideoObject(videoDetails);
+                if (!mostRecentPublishedVideo || new Date(publishedVideo.publishedAt) > new Date(mostRecentPublishedVideo.publishedAt)) {
+                    mostRecentPublishedVideo = publishedVideo;
+                    console.log(`-> Video identified as PUBLISHED: ${mostRecentPublishedVideo.title}`);
                 }
             }
         }
@@ -107,7 +128,6 @@ async function getYouTubeVideos() {
     }
 }
 
-// --- Function to post tweet ---
 async function postTweet(tweetText) {
     const client = new TwitterApi({
         appKey: process.env.TWITTER_API_KEY,
@@ -126,10 +146,9 @@ async function postTweet(tweetText) {
     }
 }
 
-// --- Function to get a random tweet ---
 function getCyclingTweet(title, link, videoType, scheduledTime = '') {
     const contextualHashtag = CONTEXTUAL_HASHTAGS[videoType] || '';
-    const allHashtags = [...STATIC_HASHTAGS, contextualHashtag].filter(Boolean).join(' ');
+    const allHashtags = [...config.STATIC_HASHTAGS, contextualHashtag].filter(Boolean).join(' ');
 
     const templatesForType = tweetTemplates[videoType];
     if (!templatesForType || templatesForType.length === 0) {
@@ -162,7 +181,7 @@ function getCyclingTweet(title, link, videoType, scheduledTime = '') {
     return `${tweetText} ${allHashtags}`;
 }
 
-// --- Main function ---
+// --- Main Execution ---
 async function main() {
     const runMode = fs.existsSync(runModeFile) ? fs.readFileSync(runModeFile, 'utf-8').trim().toLowerCase() : 'true';
     console.log(`Current Run Mode: ${runMode}`);
@@ -199,8 +218,6 @@ async function main() {
                         console.log(`Reverted ${runModeFile} to 'true' after repost.`);
                     }
                 } else {
-                    // **THIS IS THE CRITICAL FIX**
-                    // If the tweet fails, exit with an error code to make the workflow fail.
                     console.error('Tweet failed. Exiting with error code 1 to fail the workflow run.');
                     process.exit(1);
                 }
@@ -210,7 +227,7 @@ async function main() {
         }
     } catch (error) {
         console.error('An unhandled error occurred in main:', error);
-        process.exit(1); // Also fail on any other unexpected errors
+        process.exit(1);
     }
 }
 
