@@ -1,13 +1,8 @@
 name: YouTube to X Bot
 
 on:
-  # This section defines when the workflow will run.
-  # Adjust the 'cron' schedule as needed for how often you want it to run.
-  # The example below runs every hour.
   schedule:
-    - cron: '*/30 * * * *' # Runs every half hour
-
-  # This allows you to manually trigger the workflow from the GitHub UI.
+    - cron: '*/30 * * * *'
   workflow_dispatch:
 
 jobs:
@@ -41,8 +36,8 @@ jobs:
           path: |
             last-posted.txt
             template-indices.json
-          # NEW KEY: This uses a stable name + a fingerprint of your code.
-          key: bot-state-${{ hashFiles('post.js', 'package-lock.json') }}
+          # CORRECTED KEY: This uses a stable name for easy restoration.
+          key: bot-state-${{ github.ref }}
           restore-keys: |
             bot-state-
 
@@ -57,16 +52,15 @@ jobs:
           TWITTER_API_SECRET: ${{ secrets.TWITTER_API_SECRET }}
           TWITTER_ACCESS_TOKEN: ${{ secrets.TWITTER_ACCESS_TOKEN }}
           TWITTER_ACCESS_SECRET: ${{ secrets.TWITTER_ACCESS_SECRET }}
-          # NEW: Control DRY_RUN from here. 'false' means it will tweet live.
           DRY_RUN_MODE: 'false'
 
       - name: Cache bot state (save)
         uses: actions/cache/save@v4
-        # NEW CONDITION: Save the state if the bot ran successfully.
+        # This ensures the state is only saved on a successful run.
         if: success()
         with:
           path: |
             last-posted.txt
             template-indices.json
-          # SAME NEW KEY: This makes sure it updates the correct saved state.
-          key: bot-state-${{ hashFiles('post.js', 'package-lock.json') }}
+          # Use the same key to update the cache.
+          key: bot-state-${{ github.ref }}
