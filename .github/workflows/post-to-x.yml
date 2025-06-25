@@ -21,6 +21,7 @@ jobs:
         with:
           node-version: 18
 
+      # The node_modules cache is still a good idea
       - name: Cache Node modules
         uses: actions/cache@v4
         with:
@@ -29,17 +30,14 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-node-
 
-      - name: Cache bot state (restore)
-        uses: actions/cache@v4
-        id: restore-bot-state
+      # ---- START: ARTIFACT-BASED STATE MANAGEMENT ----
+      - name: Download previous bot state
+        uses: actions/download-artifact@v4
         with:
-          path: |
-            last-posted.txt
-            template-indices.json
-          # CORRECTED KEY: This uses a stable name for easy restoration.
-          key: bot-state-${{ github.ref }}
-          restore-keys: |
-            bot-state-
+          name: bot-state
+          path: . # Download to the current directory
+        # Continue even if the artifact doesn't exist (for the first run)
+        continue-on-error: true
 
       - name: Install dependencies
         run: npm install
@@ -54,13 +52,13 @@ jobs:
           TWITTER_ACCESS_SECRET: ${{ secrets.TWITTER_ACCESS_SECRET }}
           DRY_RUN_MODE: 'false'
 
-      - name: Cache bot state (save)
-        uses: actions/cache/save@v4
-        # This ensures the state is only saved on a successful run.
-        if: success()
+      - name: Upload new bot state
+        if: success() # Only upload if the script ran successfully
+        uses: actions/upload-artifact@v4
         with:
+          name: bot-state
           path: |
             last-posted.txt
             template-indices.json
-          # Use the same key to update the cache.
-          key: bot-state-${{ github.ref }}
+          # Overwrite the old artifact with the new state
+          if-no-files-found: error # Fail if the state files are missing
