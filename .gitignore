@@ -1,0 +1,15 @@
+# Dependency directories - these can be huge and should never be committed
+node_modules/
+
+# State files - these are managed by the workflow artifacts, not by git
+last-posted.txt
+template-indices.json
+run-mode.txt
+dry-run-config.txt
+
+# Log files and local environment files
+*.log
+npm-debug.log*
+
+# A common file for storing local environment variables (if you ever add one)
+.env
