@@ -3,17 +3,17 @@
 module.exports = {
     published: [
         // Your existing 20 templates, now accepting only title and link.
-        (title, link) => `New video just dropped: "${title}"\n\nGrab a cuppa and join the chill vibes. Don't miss this one! ${link}`,
+        (title, link) => `New video just dropped: "${title}"\n\nGrab a drink and join for good vibes. Don't miss this one! ${link}`,
         (title, link) => `Settling in with a new video: "${title}"\n\nCome hang out and see what adventures we stumble into! You'll love it. ${link}`,
-        (title, link) => `Ever wondered about "${title}"? My latest video explores just that!\n\nLet's find some cool stuff together. Click to watch! ${link}`,
-        (title, link) => `Fresh video out now: "${title}"\n\nHope it brings a smile and a perfect escape! ${link}`,
+        (title, link) => `Ever wondered about "${title}"? Oddly specific but my latest video explores just that!\n\nLet's find some cool stuff together. Click to watch! ${link}`,
+        (title, link) => `Fresh video out now: "${title}"\n\nHope it brings a smile! ${link}`,
         (title, link) => `Grab a snack, my new video is perfect for some laid-back viewing: "${title}"\n\nLet's wander through this one. Watch now! ${link}`,
         (title, link) => `A fresh video is up: "${title}"\n\nExpect some chill commentary and perhaps a few laughs. Don't scroll past! ${link}`,
-        (title, link) => `New video alert: "${title}"\n\nDelving deep into this one - it's a good one for just unwinding. See you there! Must watch! ${link}`,
+        (title, link) => `New video alert: "${title}"\n\nDelving deep into this one - it's a good one for unwinding. See you there! Must watch! ${link}`,
         (title, link) => `Come on in, the gaming's fine! My newest video is ready for you: "${title}"\n\nLet's see what happens! Join the fun: ${link}`,
         (title, link) => `Sometimes you just need to explore. My new video, "${title}", scratches that itch perfectly.\n\nCome discover with me! ${link}`,
         (title, link) => `Had a blast making this one: "${title}"\n\nHope you have as much fun watching. It's a journey, not a sprint. Click here: ${link}`,
-        (title, link) => `What secrets does "${title}" hold?\n\nFind out in my latest video! A cozy exploration awaits. ${link}`,
+        (title, link) => `What secrets does "${title}" hold?\n\nFind out in my latest video! Exploration awaits. ${link}`,
         (title, link) => `Fancy a virtual stroll? My new video is the perfect companion: "${title}"\n\nKick back and enjoy the views! ${link}`,
         (title, link) => `If you're into "${title}", you'll want to see this!\n\nJust posted a new video with some interesting discoveries. Check it out: ${link}`,
         (title, link) => `Join me on a little adventure: "${title}"\n\nExpect casual banter and unexpected moments in my newest upload. ${link}`,
