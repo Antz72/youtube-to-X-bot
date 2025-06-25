@@ -10,7 +10,6 @@ const templateIndexFile = 'template-indices.json';
 const runModeFile = 'run-mode.txt';
 
 // --- Hashtag Configuration ---
-// Note: STATIC_HASHTAGS now comes from config.js
 const CONTEXTUAL_HASHTAGS = {
     'live': '#LiveStream',
     'upcoming': '#UpcomingLive',
@@ -20,7 +19,7 @@ const CONTEXTUAL_HASHTAGS = {
 // --- Initialize YouTube API Client ---
 const youtube = google.youtube({
     version: 'v3',
-    auth: process.env.YOUTUBE_API_KEY, // API key from environment variables
+    auth: process.env.YOUTUBE_API_KEY,
 });
 
 // --- Utility Functions ---
@@ -37,7 +36,6 @@ function formatTimeForTweet(isoDateString) {
     });
 }
 
-// Helper function to create a consistent video object
 function createVideoObject(videoDetails, typeOverride = null) {
     const { id } = videoDetails;
     const { title, publishedAt } = videoDetails.snippet;
@@ -56,6 +54,21 @@ function createVideoObject(videoDetails, typeOverride = null) {
         type: videoType,
     };
 }
+
+function loadTemplateIndices() {
+    if (!fs.existsSync(templateIndexFile)) return {};
+    try {
+        return JSON.parse(fs.readFileSync(templateIndexFile, 'utf-8'));
+    } catch (e) {
+        console.warn('Could not parse template-indices.json, resetting.');
+        return {};
+    }
+}
+
+function saveTemplateIndices(indices) {
+    fs.writeFileSync(templateIndexFile, JSON.stringify(indices));
+}
+
 
 // --- Core Functions ---
 
@@ -76,7 +89,7 @@ async function getYouTubeVideos() {
         const playlistItemsResponse = await youtube.playlistItems.list({
             part: 'snippet',
             playlistId: uploadsPlaylistId,
-            maxResults: config.MAX_YOUTUBE_RESULTS, // Using value from config file
+            maxResults: config.MAX_YOUTUBE_RESULTS,
         });
 
         if (!playlistItemsResponse.data.items || playlistItemsResponse.data.items.length === 0) {
@@ -99,9 +112,8 @@ async function getYouTubeVideos() {
             const videoDetails = videoDetailsResponse.data.items[0];
             if (!videoDetails) continue;
 
-            const { snippet, liveStreamingDetails: liveDetails } = videoDetails;
+            const { liveStreamingDetails: liveDetails } = videoDetails;
 
-            // Using the new helper function to create video objects
             if (liveDetails && liveDetails.actualStartTime && !liveDetails.actualEndTime) {
                 currentlyLiveVideo = createVideoObject(videoDetails, 'live');
                 console.log(`-> Video identified as CURRENTLY LIVE: ${currentlyLiveVideo.title}`);
@@ -155,25 +167,19 @@ function getCyclingTweet(title, link, videoType, scheduledTime = '') {
         return `Check out my new ${videoType} video: "${title}" ${link} ${allHashtags}`;
     }
 
-    let availableIndices = {};
-    if (fs.existsSync(templateIndexFile)) {
-        try {
-            availableIndices = JSON.parse(fs.readFileSync(templateIndexFile, 'utf-8'));
-        } catch (e) {
-            availableIndices = {};
-        }
-    }
+    const allIndices = loadTemplateIndices();
 
-    let currentTypeIndices = availableIndices[videoType] || Array.from({ length: templatesForType.length }, (_, i) => i);
+    let currentTypeIndices = allIndices[videoType] || Array.from({ length: templatesForType.length }, (_, i) => i);
     if (currentTypeIndices.length === 0) {
+        console.log(`Resetting templates for type: ${videoType}`);
         currentTypeIndices = Array.from({ length: templatesForType.length }, (_, i) => i);
     }
 
     const randomArrayIndex = Math.floor(Math.random() * currentTypeIndices.length);
     const selectedTemplateIndex = currentTypeIndices.splice(randomArrayIndex, 1)[0];
-    availableIndices[videoType] = currentTypeIndices;
+    allIndices[videoType] = currentTypeIndices;
 
-    fs.writeFileSync(templateIndexFile, JSON.stringify(availableIndices));
+    saveTemplateIndices(allIndices);
 
     const templateFn = templatesForType[selectedTemplateIndex];
     const tweetText = (videoType === 'upcoming') ? templateFn(title, link, scheduledTime) : templateFn(title, link);
