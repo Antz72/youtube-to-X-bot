@@ -9,7 +9,7 @@ const YOUTUBE_API_KEY = process.env.YOUTUBE_API_KEY;
 
 const lastPostedFile = 'last-posted.txt';
 const templateIndexFile = 'template-indices.json';
-const runModeFile = 'run-mode.txt'; // CORRECTED: Now uses hyphen
+const runModeFile = 'run-mode.txt';
 
 // --- Hashtag Configuration ---
 const STATIC_HASHTAGS = ['#Gaming', '#PCGaming', '#NewVideo']; // Your static hashtags
@@ -28,7 +28,7 @@ const youtube = google.youtube({
 // --- Utility function for time formatting ---
 function formatTimeForTweet(isoDateString) {
     const date = new Date(isoDateString);
-    // Format for New Zealand Standard Standard Time (NZST), e.g., Mon, 24 Jun at 3:00 PM
+    // Format for New Zealand Standard Time (NZST), e.g., Mon, 24 Jun at 3:00 PM
     return date.toLocaleString('en-NZ', {
         weekday: 'short',
         day: 'numeric',
@@ -54,11 +54,10 @@ async function getYouTubeVideos() {
 
         const uploadsPlaylistId = channelResponse.data.items[0].contentDetails.relatedPlaylists.uploads;
 
-        // Fetch enough items to find a recent upcoming or published video
         const playlistItemsResponse = await youtube.playlistItems.list({
-            part: 'snippet', // Still need snippet for title and videoId
+            part: 'snippet',
             playlistId: uploadsPlaylistId,
-            maxResults: 3, // Now only fetches the 3 most recent videos
+            maxResults: 3,
         });
 
         if (!playlistItemsResponse.data.items || playlistItemsResponse.data.items.length === 0) {
@@ -69,19 +68,14 @@ async function getYouTubeVideos() {
         let currentlyLiveVideo = null;
         let nextUpcomingVideo = null;
         let mostRecentPublishedVideo = null;
-        const now = new Date(); // Current time to check against scheduled time
+        const now = new Date();
 
-        // Iterate through playlist items and fetch full video details for accurate status
         for (const item of playlistItemsResponse.data.items) {
             const videoId = item.snippet.resourceId.videoId;
             const videoTitle = item.snippet.title;
 
-            // --- DEBUG LOGGING START ---
             console.log(`\n--- Processing Video: ${videoTitle} (ID: ${videoId}) ---`);
-            console.log(`  Initial liveBroadcastContent from playlist item (if any): ${item.snippet.liveBroadcastContent}`);
-            // --- DEBUG LOGGING END ---
 
-            // Always fetch detailed video information including liveStreamingDetails
             const videoDetailsResponse = await youtube.videos.list({
                 part: 'snippet,liveStreamingDetails',
                 id: videoId,
@@ -95,83 +89,52 @@ async function getYouTubeVideos() {
 
             const snippet = videoDetails.snippet;
             const liveDetails = videoDetails.liveStreamingDetails;
-            const publishedAt = new Date(snippet.publishedAt); // This is the actual publish date for regular videos, or initial upload for streams
+            const publishedAt = new Date(snippet.publishedAt);
 
-            // --- DEBUG LOGGING START ---
-            console.log(`  PublishedAt from video details: ${snippet.publishedAt}`);
-            console.log(`  PublishedAt (Date object): ${publishedAt}`);
-            console.log(`  Current time (Date object): ${now}`);
-            console.log(`  Is publishedAt in future (based on video snippet)? ${publishedAt > now}`);
-            if (liveDetails) {
-                console.log(`  Live Streaming Details found: Yes`);
-                console.log(`    liveDetails.actualStartTime: ${liveDetails.actualStartTime || 'N/A'}`);
-                console.log(`    liveDetails.actualEndTime: ${liveDetails.actualEndTime || 'N/A'}`);
-                console.log(`    liveDetails.scheduledStartTime: ${liveDetails.scheduledStartTime || 'N/A'}`);
-                console.log(`    Is scheduledStartTime in future? ${liveDetails.scheduledStartTime && new Date(liveDetails.scheduledStartTime) > now}`);
-            } else {
-                console.log(`  No Live Streaming Details found. Treating as regular video.`);
-            }
-            // --- DEBUG LOGGING END ---
-
-
-            // --- Determine video type based on comprehensive details and strict priority ---
             if (liveDetails && liveDetails.actualStartTime && !liveDetails.actualEndTime) {
-                // Condition 1: Video is CURRENTLY LIVE (actual start time exists, but no actual end time yet)
                 currentlyLiveVideo = {
                     id: videoId,
                     title: videoTitle,
-                    link: `https://www.youtube.com/watch?v=${videoId}`, // Corrected YouTube link
-                    publishedAt: snippet.publishedAt, // Use video's publishedAt or actualStartTime if preferred for sorting
+                    link: `https://www.youtube.com/watch?v=${videoId}`,
+                    publishedAt: snippet.publishedAt,
                     type: 'live',
                 };
                 console.log(`  -> Video identified as CURRENTLY LIVE.`);
-                break; // Found the live one, no need to check others for now
+                break;
             } else if (liveDetails && liveDetails.scheduledStartTime && new Date(liveDetails.scheduledStartTime) > now) {
-                // Condition 2: Video is UPCOMING (scheduled start time exists and is in the future)
                 if (!nextUpcomingVideo || new Date(liveDetails.scheduledStartTime) < new Date(nextUpcomingVideo.publishedAt)) {
-                    // Prioritize the *earliest* upcoming video by its scheduled time
                     nextUpcomingVideo = {
                         id: videoId,
                         title: videoTitle,
-                        link: `https://www.youtube.com/watch?v=${videoId}`, // Corrected YouTube link
-                        publishedAt: liveDetails.scheduledStartTime, // Use scheduledStartTime for upcoming
+                        link: `https://www.youtube.com/watch?v=${videoId}`,
+                        publishedAt: liveDetails.scheduledStartTime,
                         type: 'upcoming',
                     };
                     console.log(`  -> Video identified as UPCOMING.`);
                 }
             } else {
-                // Condition 3: Video is PUBLISHED (this covers regular uploads AND completed live streams)
-                // This block is reached if:
-                //   - No liveStreamingDetails are present (a regular video upload).
-                //   - liveStreamingDetails are present, but the stream has completed (actualEndTime exists).
-                //   - liveStreamingDetails are present, but the scheduledStartTime is in the past (missed stream, now a VOD).
                 if (!mostRecentPublishedVideo || publishedAt > new Date(mostRecentPublishedVideo.publishedAt)) {
-                    // Prioritize the *most recent* published video
                     mostRecentPublishedVideo = {
                         id: videoId,
                         title: videoTitle,
-                        link: `https://www.youtube.com/watch?v=${videoId}`, // Corrected YouTube link
+                        link: `https://www.youtube.com/watch?v=${videoId}`,
                         publishedAt: snippet.publishedAt,
                         type: 'published',
                     };
-                    console.log(`  -> Video identified as PUBLISHED (regular upload or completed stream).`);
+                    console.log(`  -> Video identified as PUBLISHED.`);
                 }
             }
         }
 
-        // Final prioritization: Live > Upcoming > Published
         if (currentlyLiveVideo) {
-            console.log(`Debug: Selected LIVE Video: ${currentlyLiveVideo.title} (ID: ${currentlyLiveVideo.id})`);
             return currentlyLiveVideo;
         } else if (nextUpcomingVideo) {
-            console.log(`Debug: Selected UPCOMING Video: ${nextUpcomingVideo.title} (ID: ${nextUpcomingVideo.id})`);
             return nextUpcomingVideo;
         } else if (mostRecentPublishedVideo) {
-            console.log(`Debug: Selected PUBLISHED Video: ${mostRecentPublishedVideo.title} (ID: ${mostRecentPublishedVideo.id})`);
             return mostRecentPublishedVideo;
         }
 
-        return null; // No relevant video found
+        return null;
     } catch (error) {
         console.error('Error fetching YouTube videos from API:', error.message);
         if (error.response && error.response.data) {
@@ -193,6 +156,7 @@ async function postTweet(tweetText) {
     try {
         await client.v2.tweet(tweetText);
         console.log('✅ Tweet posted!');
+        return true; // Return true on success
     } catch (e) {
         console.error('❌ Error posting tweet:', e);
         if (e.data && e.data.errors) {
@@ -200,18 +164,18 @@ async function postTweet(tweetText) {
                 console.error(`Twitter API Error: Code ${err.code} - ${err.message}`);
             });
         }
+        return false; // Return false on failure
     }
 }
 
-// Function to get a random tweet ensuring no repeats until all are used
+// --- Function to get a random tweet ---
 function getCyclingTweet(title, link, videoType, scheduledTime = '') {
-    // Generate hashtags
     const contextualHashtag = CONTEXTUAL_HASHTAGS[videoType] || '';
     const allHashtags = [...STATIC_HASHTAGS, contextualHashtag].filter(tag => tag !== '').join(' ');
 
     const templatesForType = tweetTemplates[videoType];
     if (!templatesForType || templatesForType.length === 0) {
-        console.error(`No tweet templates found for type: ${videoType}. Falling back to default.`);
+        console.error(`No tweet templates found for type: ${videoType}.`);
         return `Check out my new ${videoType} video: "${title}" ${link} ${allHashtags}`;
     }
 
@@ -221,13 +185,12 @@ function getCyclingTweet(title, link, videoType, scheduledTime = '') {
             availableIndices = JSON.parse(fs.readFileSync(templateIndexFile, 'utf-8'));
         } catch (e) {
             console.error('Error parsing template-indices.json, resetting:', e);
-            availableIndices = {}; // Reset if parsing fails
+            availableIndices = {};
         }
     }
 
     let currentTypeIndices = availableIndices[videoType] || [];
     if (currentTypeIndices.length === 0) {
-        console.log(`Debug: Initializing or resetting template indices for ${videoType}.`);
         currentTypeIndices = Array.from({ length: templatesForType.length }, (_, i) => i);
     }
 
@@ -238,41 +201,37 @@ function getCyclingTweet(title, link, videoType, scheduledTime = '') {
     availableIndices[videoType] = currentTypeIndices;
 
     fs.writeFileSync(templateIndexFile, JSON.stringify(availableIndices));
-    console.log(`Debug: Remaining template indices for ${videoType}: ${currentTypeIndices}`);
 
     const templateFn = templatesForType[selectedTemplateIndex];
     let tweetText;
     if (videoType === 'upcoming') {
         tweetText = templateFn(title, link, scheduledTime);
-    } else { // 'live' or 'published' type
+    } else {
         tweetText = templateFn(title, link);
     }
 
-    // Append hashtags to the generated tweet text
     return `${tweetText} ${allHashtags}`;
 }
 
+// --- Main function ---
 async function main() {
-    let runMode = 'true'; // Default run mode (dry run)
+    let runMode = 'true';
     if (fs.existsSync(runModeFile)) {
         try {
             runMode = fs.readFileSync(runModeFile, 'utf-8').trim().toLowerCase();
         } catch (e) {
             console.error(`Error reading ${runModeFile}:`, e.message);
-            console.log('Defaulting runMode to "true" due to error.');
             runMode = 'true';
         }
     } else {
-        console.log(`Warning: ${runModeFile} not found. Defaulting runMode to "true".`);
-        fs.writeFileSync(runModeFile, 'true'); // Create file with default if not exists
+        fs.writeFileSync(runModeFile, 'true');
     }
     console.log(`Current Run Mode: ${runMode}`);
-
 
     try {
         const latestVideo = await getYouTubeVideos();
         if (!latestVideo) {
-            console.log('No new relevant videos found from YouTube API.');
+            console.log('No new relevant videos found.');
             return;
         }
 
@@ -282,21 +241,16 @@ async function main() {
         let lastPostedIdentifier = '';
         if (fs.existsSync(lastPostedFile)) {
             lastPostedIdentifier = fs.readFileSync(lastPostedFile, 'utf-8').trim();
-            console.log(`Debug: Found last-posted.txt. Last posted identifier: ${lastPostedIdentifier}`);
-        } else {
-            console.log('Debug: last-posted.txt not found. Treating as first run or missing file.');
         }
 
         let shouldPost = false;
-
         if (runMode === 'repost') {
-            console.log('--- REPOST MODE: Attempting to repost the last identified video. ---');
-            shouldPost = true; // Force posting
+            shouldPost = true;
         } else if (currentVideoIdentifier !== lastPostedIdentifier) {
-            console.log(`🎉 New ${type} video/stream detected!`);
-            shouldPost = true; // Post if new
+            console.log(`🎉 New ${type} video detected!`);
+            shouldPost = true;
         } else {
-            console.log(`ℹ️ No new ${type} video or stream to post.`);
+            console.log(`ℹ️ No new ${type} video to post.`);
         }
 
         if (shouldPost) {
@@ -304,25 +258,24 @@ async function main() {
             if (type === 'upcoming') {
                 const formattedTime = formatTimeForTweet(publishedAt);
                 tweet = getCyclingTweet(title, link, type, formattedTime);
-            } else if (type === 'live') {
-                tweet = getCyclingTweet(title, link, type);
-            } else { // type === 'published'
+            } else {
                 tweet = getCyclingTweet(title, link, type);
             }
 
-            console.log(`Generated Tweet Text for type "${type}":\n${tweet}\n`);
+            console.log(`Generated Tweet Text:\n${tweet}\n`);
 
-            if (runMode === 'true') { // If it's a 'true' (dry run) mode
-                console.log('--- DRY RUN MODE: Tweet NOT posted to Twitter. ---');
-            } else { // This handles 'false' (normal) and 'repost'
-                await postTweet(tweet);
-                fs.writeFileSync(lastPostedFile, currentVideoIdentifier);
-                console.log(`Updated last-posted.txt with identifier: ${currentVideoIdentifier}`);
+            if (runMode === 'true') {
+                console.log('--- DRY RUN MODE: Tweet NOT posted. ---');
+            } else {
+                const tweetSuccessful = await postTweet(tweet);
 
-                // If in 'repost' mode, revert run_mode.txt to 'true' after posting
-                if (runMode === 'repost') {
-                    fs.writeFileSync(runModeFile, 'true'); // Revert to default dry run mode
-                    console.log(`Reverted ${runModeFile} to 'true' after repost.`);
+                if (tweetSuccessful) {
+                    fs.writeFileSync(lastPostedFile, currentVideoIdentifier);
+                    console.log(`Updated last-posted.txt with: ${currentVideoIdentifier}`);
+                    if (runMode === 'repost') {
+                        fs.writeFileSync(runModeFile, 'true');
+                        console.log(`Reverted ${runModeFile} to 'true' after repost.`);
+                    }
                 }
             }
         }
