@@ -11,6 +11,13 @@ on:
 jobs:
   post-to-x:
     runs-on: ubuntu-24.04
+    
+    # This block grants the workflow the permissions it needs.
+    permissions:
+      # Required to read artifacts from previous workflow runs.
+      actions: read
+      # Required for the checkout action to read your repository's code.
+      contents: read
 
     steps:
       # Step 1: Check out your repository's code
