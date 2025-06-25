@@ -2,7 +2,10 @@ name: YouTube to X Bot
 
 on:
   schedule:
+    # This runs the workflow every 30 minutes.
     - cron: '*/30 * * * *'
+  
+  # This allows you to manually trigger the workflow from the GitHub Actions tab.
   workflow_dispatch:
 
 jobs:
@@ -10,18 +13,21 @@ jobs:
     runs-on: ubuntu-24.04
 
     steps:
+      # Step 1: Check out your repository's code
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           repository: Antz72/youtube-to-X-bot
           fetch-depth: 1
 
+      # Step 2: Set up the Node.js environment
       - name: Set up Node.js 18
         uses: actions/setup-node@v4
         with:
           node-version: 18
 
-      # The node_modules cache is still a good idea
+      # Step 3: Cache the node_modules directory for faster installs
+      # This is for efficiency and is separate from the bot's state.
       - name: Cache Node modules
         uses: actions/cache@v4
         with:
@@ -30,18 +36,27 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-node-
 
-      # ---- START: ARTIFACT-BASED STATE MANAGEMENT ----
+      # Step 4: Download the state files from the last successful run
+      # This is the key step to remember what was last posted.
       - name: Download previous bot state
-        uses: actions/download-artifact@v4
+        uses: dawidd6/action-download-artifact@v6
         with:
+          # Get the artifact from this same workflow file
+          workflow: ${{ github.workflow }}
+          # Only get artifacts from runs that completed successfully
+          workflow_conclusion: success
+          # The name of the artifact to download
           name: bot-state
-          path: . # Download to the current directory
-        # Continue even if the artifact doesn't exist (for the first run)
+          # Download the files into the current directory
+          path: .
+        # Important: Don't fail the job if this is the very first run and no artifact exists yet.
         continue-on-error: true
 
+      # Step 5: Install the project dependencies (e.g., twitter-api-v2, googleapis)
       - name: Install dependencies
         run: npm install
 
+      # Step 6: Run your main Node.js script
       - name: Run posting script
         run: node post.js
         env:
@@ -50,15 +65,17 @@ jobs:
           TWITTER_API_SECRET: ${{ secrets.TWITTER_API_SECRET }}
           TWITTER_ACCESS_TOKEN: ${{ secrets.TWITTER_ACCESS_TOKEN }}
           TWITTER_ACCESS_SECRET: ${{ secrets.TWITTER_ACCESS_SECRET }}
-          DRY_RUN_MODE: 'false'
+          DRY_RUN_MODE: 'false' # Set to 'false' for live tweeting
 
+      # Step 7: Upload the new state files as an artifact for the next run
+      # This happens only if the script runs successfully.
       - name: Upload new bot state
-        if: success() # Only upload if the script ran successfully
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: bot-state
           path: |
             last-posted.txt
             template-indices.json
-          # Overwrite the old artifact with the new state
-          if-no-files-found: error # Fail if the state files are missing
+          # If for some reason the state files weren't created, fail the workflow.
+          if-no-files-found: error
