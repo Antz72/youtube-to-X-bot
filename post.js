@@ -12,7 +12,7 @@ const templateIndexFile = 'template-indices.json';
 const runModeFile = 'run-mode.txt';
 
 // --- Hashtag Configuration ---
-const STATIC_HASHTAGS = ['#Gaming', '#PCGaming', '#NewVideo']; // Your static hashtags
+const STATIC_HASHTAGS = ['#Gaming', '#PCGaming', '#NewVideo'];
 const CONTEXTUAL_HASHTAGS = {
     'live': '#LiveStream',
     'upcoming': '#UpcomingLive',
@@ -28,14 +28,13 @@ const youtube = google.youtube({
 // --- Utility function for time formatting ---
 function formatTimeForTweet(isoDateString) {
     const date = new Date(isoDateString);
-    // Format for New Zealand Standard Time (NZST), e.g., Mon, 24 Jun at 3:00 PM
     return date.toLocaleString('en-NZ', {
         weekday: 'short',
         day: 'numeric',
         month: 'short',
         hour: 'numeric',
         minute: 'numeric',
-        hour12: true, // Use 12-hour clock (e.g., 3:00 PM)
+        hour12: true,
     });
 }
 
@@ -74,72 +73,35 @@ async function getYouTubeVideos() {
             const videoId = item.snippet.resourceId.videoId;
             const videoTitle = item.snippet.title;
 
-            console.log(`\n--- Processing Video: ${videoTitle} (ID: ${videoId}) ---`);
-
             const videoDetailsResponse = await youtube.videos.list({
                 part: 'snippet,liveStreamingDetails',
                 id: videoId,
             });
 
             const videoDetails = videoDetailsResponse.data.items[0];
-            if (!videoDetails) {
-                console.log(`  No details found for video ID: ${videoId}. Skipping.`);
-                continue;
-            }
+            if (!videoDetails) continue;
 
             const snippet = videoDetails.snippet;
             const liveDetails = videoDetails.liveStreamingDetails;
             const publishedAt = new Date(snippet.publishedAt);
 
             if (liveDetails && liveDetails.actualStartTime && !liveDetails.actualEndTime) {
-                currentlyLiveVideo = {
-                    id: videoId,
-                    title: videoTitle,
-                    link: `https://www.youtube.com/watch?v=${videoId}`,
-                    publishedAt: snippet.publishedAt,
-                    type: 'live',
-                };
-                console.log(`  -> Video identified as CURRENTLY LIVE.`);
+                currentlyLiveVideo = { id: videoId, title: videoTitle, link: `https://www.youtube.com/watch?v=${videoId}`, publishedAt: snippet.publishedAt, type: 'live' };
                 break;
             } else if (liveDetails && liveDetails.scheduledStartTime && new Date(liveDetails.scheduledStartTime) > now) {
                 if (!nextUpcomingVideo || new Date(liveDetails.scheduledStartTime) < new Date(nextUpcomingVideo.publishedAt)) {
-                    nextUpcomingVideo = {
-                        id: videoId,
-                        title: videoTitle,
-                        link: `https://www.youtube.com/watch?v=${videoId}`,
-                        publishedAt: liveDetails.scheduledStartTime,
-                        type: 'upcoming',
-                    };
-                    console.log(`  -> Video identified as UPCOMING.`);
+                    nextUpcomingVideo = { id: videoId, title: videoTitle, link: `https://www.youtube.com/watch?v=${videoId}`, publishedAt: liveDetails.scheduledStartTime, type: 'upcoming' };
                 }
             } else {
                 if (!mostRecentPublishedVideo || publishedAt > new Date(mostRecentPublishedVideo.publishedAt)) {
-                    mostRecentPublishedVideo = {
-                        id: videoId,
-                        title: videoTitle,
-                        link: `https://www.youtube.com/watch?v=${videoId}`,
-                        publishedAt: snippet.publishedAt,
-                        type: 'published',
-                    };
-                    console.log(`  -> Video identified as PUBLISHED.`);
+                    mostRecentPublishedVideo = { id: videoId, title: videoTitle, link: `https://www.youtube.com/watch?v=${videoId}`, publishedAt: snippet.publishedAt, type: 'published' };
                 }
             }
         }
 
-        if (currentlyLiveVideo) {
-            return currentlyLiveVideo;
-        } else if (nextUpcomingVideo) {
-            return nextUpcomingVideo;
-        } else if (mostRecentPublishedVideo) {
-            return mostRecentPublishedVideo;
-        }
-
-        return null;
+        return currentlyLiveVideo || nextUpcomingVideo || mostRecentPublishedVideo || null;
     } catch (error) {
         console.error('Error fetching YouTube videos from API:', error.message);
-        if (error.response && error.response.data) {
-            console.error('YouTube API Error Details:', error.response.data);
-        }
         return null;
     }
 }
@@ -156,26 +118,20 @@ async function postTweet(tweetText) {
     try {
         await client.v2.tweet(tweetText);
         console.log('✅ Tweet posted!');
-        return true; // Return true on success
+        return true;
     } catch (e) {
         console.error('❌ Error posting tweet:', e);
-        if (e.data && e.data.errors) {
-            e.data.errors.forEach(err => {
-                console.error(`Twitter API Error: Code ${err.code} - ${err.message}`);
-            });
-        }
-        return false; // Return false on failure
+        return false;
     }
 }
 
 // --- Function to get a random tweet ---
 function getCyclingTweet(title, link, videoType, scheduledTime = '') {
     const contextualHashtag = CONTEXTUAL_HASHTAGS[videoType] || '';
-    const allHashtags = [...STATIC_HASHTAGS, contextualHashtag].filter(tag => tag !== '').join(' ');
+    const allHashtags = [...STATIC_HASHTAGS, contextualHashtag].filter(Boolean).join(' ');
 
     const templatesForType = tweetTemplates[videoType];
     if (!templatesForType || templatesForType.length === 0) {
-        console.error(`No tweet templates found for type: ${videoType}.`);
         return `Check out my new ${videoType} video: "${title}" ${link} ${allHashtags}`;
     }
 
@@ -184,48 +140,30 @@ function getCyclingTweet(title, link, videoType, scheduledTime = '') {
         try {
             availableIndices = JSON.parse(fs.readFileSync(templateIndexFile, 'utf-8'));
         } catch (e) {
-            console.error('Error parsing template-indices.json, resetting:', e);
             availableIndices = {};
         }
     }
 
-    let currentTypeIndices = availableIndices[videoType] || [];
+    let currentTypeIndices = availableIndices[videoType] || Array.from({ length: templatesForType.length }, (_, i) => i);
     if (currentTypeIndices.length === 0) {
         currentTypeIndices = Array.from({ length: templatesForType.length }, (_, i) => i);
     }
 
     const randomArrayIndex = Math.floor(Math.random() * currentTypeIndices.length);
-    const selectedTemplateIndex = currentTypeIndices[randomArrayIndex];
-
-    currentTypeIndices.splice(randomArrayIndex, 1);
+    const selectedTemplateIndex = currentTypeIndices.splice(randomArrayIndex, 1)[0];
     availableIndices[videoType] = currentTypeIndices;
 
     fs.writeFileSync(templateIndexFile, JSON.stringify(availableIndices));
 
     const templateFn = templatesForType[selectedTemplateIndex];
-    let tweetText;
-    if (videoType === 'upcoming') {
-        tweetText = templateFn(title, link, scheduledTime);
-    } else {
-        tweetText = templateFn(title, link);
-    }
+    const tweetText = (videoType === 'upcoming') ? templateFn(title, link, scheduledTime) : templateFn(title, link);
 
     return `${tweetText} ${allHashtags}`;
 }
 
 // --- Main function ---
 async function main() {
-    let runMode = 'true';
-    if (fs.existsSync(runModeFile)) {
-        try {
-            runMode = fs.readFileSync(runModeFile, 'utf-8').trim().toLowerCase();
-        } catch (e) {
-            console.error(`Error reading ${runModeFile}:`, e.message);
-            runMode = 'true';
-        }
-    } else {
-        fs.writeFileSync(runModeFile, 'true');
-    }
+    const runMode = fs.existsSync(runModeFile) ? fs.readFileSync(runModeFile, 'utf-8').trim().toLowerCase() : 'true';
     console.log(`Current Run Mode: ${runMode}`);
 
     try {
@@ -237,37 +175,20 @@ async function main() {
 
         const { id, title, link, publishedAt, type } = latestVideo;
         const currentVideoIdentifier = `${id}:${type}`;
+        const lastPostedIdentifier = fs.existsSync(lastPostedFile) ? fs.readFileSync(lastPostedFile, 'utf-8').trim() : '';
 
-        let lastPostedIdentifier = '';
-        if (fs.existsSync(lastPostedFile)) {
-            lastPostedIdentifier = fs.readFileSync(lastPostedFile, 'utf-8').trim();
-        }
-
-        let shouldPost = false;
-        if (runMode === 'repost') {
-            shouldPost = true;
-        } else if (currentVideoIdentifier !== lastPostedIdentifier) {
-            console.log(`🎉 New ${type} video detected!`);
-            shouldPost = true;
-        } else {
-            console.log(`ℹ️ No new ${type} video to post.`);
-        }
+        const shouldPost = (runMode === 'repost') || (currentVideoIdentifier !== lastPostedIdentifier);
 
         if (shouldPost) {
-            let tweet;
-            if (type === 'upcoming') {
-                const formattedTime = formatTimeForTweet(publishedAt);
-                tweet = getCyclingTweet(title, link, type, formattedTime);
-            } else {
-                tweet = getCyclingTweet(title, link, type);
-            }
-
-            console.log(`Generated Tweet Text:\n${tweet}\n`);
+            if (currentVideoIdentifier !== lastPostedIdentifier) console.log(`🎉 New ${type} video detected!`);
+            
+            const tweetText = getCyclingTweet(title, link, type, type === 'upcoming' ? formatTimeForTweet(publishedAt) : '');
+            console.log(`Generated Tweet Text:\n${tweetText}\n`);
 
             if (runMode === 'true') {
                 console.log('--- DRY RUN MODE: Tweet NOT posted. ---');
             } else {
-                const tweetSuccessful = await postTweet(tweet);
+                const tweetSuccessful = await postTweet(tweetText);
 
                 if (tweetSuccessful) {
                     fs.writeFileSync(lastPostedFile, currentVideoIdentifier);
@@ -276,11 +197,19 @@ async function main() {
                         fs.writeFileSync(runModeFile, 'true');
                         console.log(`Reverted ${runModeFile} to 'true' after repost.`);
                     }
+                } else {
+                    // **THIS IS THE CRITICAL FIX**
+                    // If the tweet fails, exit with an error code to make the workflow fail.
+                    console.error('Tweet failed. Exiting with error code 1 to fail the workflow run.');
+                    process.exit(1);
                 }
             }
+        } else {
+            console.log(`ℹ️ No new ${type} video to post.`);
         }
     } catch (error) {
-        console.error('An error occurred in main:', error);
+        console.error('An unhandled error occurred in main:', error);
+        process.exit(1); // Also fail on any other unexpected errors
     }
 }
 
