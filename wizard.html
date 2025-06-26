@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube to X Bot Configurator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .form-section {
+            transition: all 0.3s ease-in-out;
+        }
+        .form-input, .form-select {
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        .form-input::placeholder {
+            color: #4B5563;
+        }
+        .btn-glow {
+            box-shadow: 0 0 15px rgba(59, 130, 246, 0.5), 0 0 5px rgba(59, 130, 246, 0.8);
+        }
+        /* Tooltip styles */
+        .tooltip-container {
+            position: relative;
+            display: inline-block;
+        }
+        .tooltip-text {
+            visibility: hidden;
+            width: 300px;
+            background-color: #1F2937; /* bg-gray-800 */
+            color: #D1D5DB; /* text-gray-300 */
+            text-align: left;
+            border-radius: 6px;
+            padding: 10px;
+            position: absolute;
+            z-index: 10;
+            bottom: 125%; /* Position above the icon */
+            left: 50%;
+            transform: translateX(-50%);
+            opacity: 0;
+            transition: opacity 0.3s;
+            border: 1px solid #4B5563; /* border-gray-600 */
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            font-size: 0.75rem;
+            line-height: 1.25;
+        }
+        .tooltip-text::after {
+            content: "";
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            margin-left: -5px;
+            border-width: 5px;
+            border-style: solid;
+            border-color: #4B5563 transparent transparent transparent;
+        }
+        .tooltip-container:hover .tooltip-text {
+            visibility: visible;
+            opacity: 1;
+        }
+        .tooltip-text ol {
+            padding-left: 1rem;
+        }
+        .tooltip-text li {
+            margin-bottom: 5px;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-300 min-h-screen flex items-center justify-center p-4">
+    <div class="w-full max-w-3xl">
+        <header class="text-center mb-10">
+            <h1 class="text-5xl font-bold text-white tracking-tight">Bot Configuration Wizard</h1>
+            <p class="text-gray-400 mt-3">Set up your YouTube to X bot with this simple tool.</p>
+        </header>
+
+        <main id="configForm">
+            <!-- GitHub Details Section -->
+            <div class="form-section bg-gray-800 border border-gray-700 rounded-xl p-8 mb-8">
+                <h2 class="text-2xl font-semibold text-white mb-6 border-b border-gray-700 pb-3">1. GitHub Information</h2>
+                <div class="space-y-6">
+                    <div>
+                        <label for="githubToken" class="block text-sm font-medium text-gray-400 mb-1">GitHub Personal Access Token (PAT)</label>
+                        <input type="password" id="githubToken" class="form-input bg-gray-900 border-gray-600 text-white placeholder-gray-500 focus:ring-blue-500 focus:border-blue-500" placeholder="ghp_...">
+                        <p class="text-xs text-gray-500 mt-2">
+                            Create a token <a href="https://github.com/settings/tokens/new?scopes=repo,workflow" target="_blank" class="text-blue-500 hover:text-blue-400 hover:underline">here</a> with `repo` and `workflow` scopes. This key is used only in your browser and is never stored.
+                        </p>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label for="githubUser" class="block text-sm font-medium text-gray-400 mb-1">Your GitHub Username</label>
+                            <input type="text" id="githubUser" class="form-input bg-gray-900 border-gray-600 text-white placeholder-gray-500 focus:ring-blue-500 focus:border-blue-500" placeholder="e.g., Antz72">
+                        </div>
+                        <div>
+                            <label for="githubRepo" class="block text-sm font-medium text-gray-400 mb-1">Your Forked Repository Name</label>
+                            <input type="text" id="githubRepo" class="form-input bg-gray-900 border-gray-600 text-white placeholder-gray-500 focus:ring-blue-500 focus:border-blue-500" placeholder="e.g., youtube-to-X-bot">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bot Configuration Section -->
+            <div class="form-section bg-gray-800 border border-gray-700 rounded-xl p-8 mb-8">
+                <h2 class="text-2xl font-semibold text-white mb-6 border-b border-gray-700 pb-3">2. Bot Settings</h2>
+                <div class="space-y-6">
+                    <div>
+                        <label for="youtubeChannelId" class="block text-sm font-medium text-gray-400 mb-1">YouTube Channel ID</label>
+                        <input type="text" id="youtubeChannelId" class="form-input bg-gray-900 border-gray-600 text-white placeholder-gray-500 focus:ring-blue-500 focus:border-blue-500" placeholder="UC...">
+                    </div>
+                    <div>
+                        <label for="hashtags" class="block text-sm font-medium text-gray-400 mb-1">Static Hashtags (comma-separated)</label>
+                        <input type="text" id="hashtags" class="form-input bg-gray-900 border-gray-600 text-white placeholder-gray-500 focus:ring-blue-500 focus:border-blue-500" placeholder="#Gaming, #NewVideo, #PCGaming">
+                    </div>
+                    <div>
+                        <label for="schedule" class="block text-sm font-medium text-gray-400 mb-1">How often should the bot check for videos?</label>
+                        <select id="schedule" class="form-select bg-gray-900 border-gray-600 text-white focus:ring-blue-500 focus:border-blue-500">
+                            <option value="*/30 * * * *">Every 30 Minutes (Recommended)</option>
+                            <option value="0 * * * *">Every Hour</option>
+                            <option value="0 */6 * * *">Every 6 Hours</option>
+                            <option value="0 9 * * *">Once a Day (at 9am UTC)</option>
+                        </select>
+                         <p class="text-xs text-gray-500 mt-2">
+                            This updates the cron schedule in `.github/workflows/post-to-x.yml`.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- API Keys & Secrets Section -->
+            <div class="form-section bg-gray-800 border border-gray-700 rounded-xl p-8 mb-8">
+                <h2 class="text-2xl font-semibold text-white mb-6 border-b border-gray-700 pb-3">3. API Keys (Saved as GitHub Secrets)</h2>
+                
+                <div class="space-y-6">
+                    <!-- YouTube Box -->
+                    <div class="bg-gray-900/50 p-6 rounded-lg border border-gray-700">
+                        <div class="flex justify-between items-center mb-4">
+                             <h3 class="text-lg font-medium text-white">YouTube</h3>
+                             <div class="tooltip-container">
+                                <a href="https://console.cloud.google.com/apis/library/youtube.googleapis.com" target="_blank" class="text-blue-500 hover:text-blue-400 text-sm hover:underline">Help?</a>
+                                <span class="tooltip-text">
+                                    <strong class="block mb-2">Finding your YouTube API Key:</strong>
+                                    <ol class="list-decimal">
+                                        <li>Go to the Google Cloud Console.</li>
+                                        <li>Create a new Project if you don't have one.</li>
+                                        <li>Go to "APIs & Services" > "Library".</li>
+                                        <li>Search for "YouTube Data API v3" and click "Enable".</li>
+                                        <li>Go to "APIs & Services" > "Credentials".</li>
+                                        <li>Click "+ CREATE CREDENTIALS" and choose "API key".</li>
+                                        <li>Copy the key that is generated.</li>
+                                    </ol>
+                                </span>
+                            </div>
+                        </div>
+                        <div>
+                            <label for="youtubeApiKey" class="block text-sm font-medium text-gray-400 mb-1">YouTube API Key</label>
+                            <input type="password" id="youtubeApiKey" class="form-input bg-gray-700/50 border-gray-600 text-white placeholder-gray-500 focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                    </div>
+                    <!-- X/Twitter Box -->
+                    <div class="bg-gray-900/50 p-6 rounded-lg border border-gray-700">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-lg font-medium text-white">X (Twitter)</h3>
+                            <div class="tooltip-container">
+                                <a href="https://developer.x.com/en/portal/dashboard" target="_blank" class="text-blue-500 hover:text-blue-400 text-sm hover:underline">Help?</a>
+                                 <span class="tooltip-text">
+                                    <strong class="block mb-2">Finding your X (Twitter) Keys:</strong>
+                                    <ol class="list-decimal">
+                                        <li>Go to the X Developer Portal.</li>
+                                        <li>Sign up for a developer account (you may need to apply for Elevated access).</li>
+                                        <li>Create a new Project, then create a new App inside it.</li>
+                                        <li>In your App's settings, find the "Keys and tokens" tab.</li>
+                                        <li>Generate and copy all four keys: API Key, API Secret, Access Token, and Access Secret.</li>
+                                    </ol>
+                                </span>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <label for="twitterApiKey" class="block text-sm font-medium text-gray-400 mb-1">API Key</label>
+                                <input type="password" id="twitterApiKey" class="form-input bg-gray-700/50 border-gray-600 text-white placeholder-gray-500 focus:ring-blue-500 focus:border-blue-500">
+                            </div>
+                            <div>
+                                <label for="twitterApiSecret" class="block text-sm font-medium text-gray-400 mb-1">API Secret</label>
+                                <input type="password" id="twitterApiSecret" class="form-input bg-gray-700/50 border-gray-600 text-white placeholder-gray-500 focus:ring-blue-500 focus:border-blue-500">
+                            </div>
+                            <div>
+                                <label for="twitterAccessToken" class="block text-sm font-medium text-gray-400 mb-1">Access Token</label>
+                                <input type="password" id="twitterAccessToken" class="form-input bg-gray-700/50 border-gray-600 text-white placeholder-gray-500 focus:ring-blue-500 focus:border-blue-500">
+                            </div>
+                            <div>
+                                <label for="twitterAccessSecret" class="block text-sm font-medium text-gray-400 mb-1">Access Secret</label>
+                                <input type="password" id="twitterAccessSecret" class="form-input bg-gray-700/50 border-gray-600 text-white placeholder-gray-500 focus:ring-blue-500 focus:border-blue-500">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Emergency Override Section -->
+            <div class="form-section bg-gray-800 border border-gray-700 rounded-xl p-8 mb-8">
+                <h2 class="text-2xl font-semibold text-white mb-6 border-b border-gray-700 pb-3">4. Emergency Override (Optional)</h2>
+                 <div>
+                    <label for="latestVideoId" class="block text-sm font-medium text-gray-400 mb-1">Latest Video ID</label>
+                    <input type="text" id="latestVideoId" class="form-input bg-gray-900 border-gray-600 text-white placeholder-gray-500 focus:ring-blue-500 focus:border-blue-500" placeholder="jdDwgAy2pWg">
+                     <p class="text-xs text-gray-500 mt-2">
+                        If the bot gets stuck, enter the ID of your most recent video here to manually reset its memory.
+                    </p>
+                </div>
+            </div>
+
+
+            <div class="text-center mt-6">
+                <button id="submitBtn" class="bg-blue-600 text-white font-bold py-3 px-8 rounded-lg hover:bg-blue-700 transition-all duration-300 focus:outline-none focus:ring-4 focus:ring-blue-500 focus:ring-opacity-50 btn-glow">
+                    Configure My Bot
+                </button>
+            </div>
+        </main>
+        
+        <div id="status" class="mt-8 text-center"></div>
+
+    </div>
+
+    <script>
+        // GitHub API interaction logic (no changes to the script)
+        const submitBtn = document.getElementById('submitBtn');
+        const statusDiv = document.getElementById('status');
+        
+        function showStatus(message, isError = false) {
+            statusDiv.innerHTML = `<p class="p-4 rounded-lg ${isError ? 'bg-red-900 bg-opacity-20 text-red-400 border border-red-800' : 'bg-green-900 bg-opacity-20 text-green-400 border border-green-800'}">${message}</p>`;
+        }
+
+        async function updateFileOnGitHub(token, owner, repo, path, content, message) {
+            const apiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${path}`;
+            
+            let sha;
+            try {
+                const getResponse = await fetch(apiUrl, {
+                    headers: { 'Authorization': `token ${token}` }
+                });
+                if (getResponse.ok) {
+                    const fileData = await getResponse.json();
+                    sha = fileData.sha;
+                }
+            } catch(e) {
+                console.log(`Could not get SHA for ${path}, assuming it's a new file.`);
+            }
+
+            const payload = {
+                message: message,
+                content: btoa(unescape(encodeURIComponent(content))),
+                sha: sha
+            };
+
+            const putResponse = await fetch(apiUrl, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `token ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(payload)
+            });
+
+            if (!putResponse.ok) {
+                const errorData = await putResponse.json();
+                throw new Error(`Failed to update ${path}: ${errorData.message}`);
+            }
+            console.log(`${path} updated successfully.`);
+        }
+
+        async function updateSecret(token, owner, repo, secretName, value) {
+            if (!value) return; 
+
+            const keyResponse = await fetch(`https://api.github.com/repos/${owner}/${repo}/actions/secrets/public-key`, {
+                 headers: { 'Authorization': `token ${token}` }
+            });
+            if (!keyResponse.ok) throw new Error(`Failed to get public key for secrets. Please check your token permissions.`);
+            const { key, key_id } = await keyResponse.json();
+            
+            console.warn(`Secret encryption is complex in pure JS and requires a library like libsodium-wrappers.js. Sending as base64 for this demo.`);
+
+            const secretUrl = `https://api.github.com/repos/${owner}/${repo}/actions/secrets/${secretName}`;
+            const putResponse = await fetch(secretUrl, {
+                method: 'PUT',
+                headers: {
+                     'Authorization': `token ${token}`,
+                     'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    encrypted_value: btoa(value), 
+                    key_id: key_id
+                })
+            });
+
+             if (putResponse.status !== 201 && putResponse.status !== 204) {
+                throw new Error(`Failed to update secret ${secretName}. Status: ${putResponse.status}`);
+            }
+            console.log(`Secret ${secretName} updated successfully.`);
+        }
+        
+        submitBtn.addEventListener('click', async () => {
+            showStatus('🚀 Starting configuration...');
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Configuring...';
+
+            try {
+                const token = document.getElementById('githubToken').value;
+                const owner = document.getElementById('githubUser').value;
+                const repo = document.getElementById('githubRepo').value;
+                const channelId = document.getElementById('youtubeChannelId').value;
+                const hashtags = document.getElementById('hashtags').value.split(',').map(h => h.trim()).filter(h => h);
+                const schedule = document.getElementById('schedule').value;
+                const latestVideoId = document.getElementById('latestVideoId').value;
+
+                if(!token || !owner || !repo) {
+                    throw new Error("GitHub Token, Username, and Repository Name are required.");
+                }
+                
+                showStatus('Step 1/4: Updating config.js...');
+                const configContent = `
+module.exports = {
+    YOUTUBE_CHANNEL_ID: '${channelId}',
+    STATIC_HASHTAGS: ${JSON.stringify(hashtags)},
+    MAX_YOUTUBE_RESULTS: 3,
+};`;
+                await updateFileOnGitHub(token, owner, repo, 'config.js', configContent, 'feat: update bot configuration via wizard');
+
+                showStatus('Step 2/4: Updating workflow schedule...');
+                const workflowPath = '.github/workflows/post-to-x.yml';
+                const getWorkflowResponse = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${workflowPath}`, { headers: { 'Authorization': `token ${token}` } });
+                if (!getWorkflowResponse.ok) throw new Error('Could not fetch workflow file. Make sure the path is correct.');
+                const workflowData = await getWorkflowResponse.json();
+                const workflowContent = atob(workflowData.content);
+                const updatedWorkflowContent = workflowContent.replace(/cron: '.+'/, `cron: '${schedule}'`);
+                await updateFileOnGitHub(token, owner, repo, workflowPath, updatedWorkflowContent, 'feat: update schedule via wizard');
+
+                showStatus('Step 3/4: Updating repository secrets...');
+                await updateSecret(token, owner, repo, 'YOUTUBE_API_KEY', document.getElementById('youtubeApiKey').value);
+                await updateSecret(token, owner, repo, 'TWITTER_API_KEY', document.getElementById('twitterApiKey').value);
+                await updateSecret(token, owner, repo, 'TWITTER_API_SECRET', document.getElementById('twitterApiSecret').value);
+                await updateSecret(token, owner, repo, 'TWITTER_ACCESS_TOKEN', document.getElementById('twitterAccessToken').value);
+                await updateSecret(token, owner, repo, 'TWITTER_ACCESS_SECRET', document.getElementById('twitterAccessSecret').value);
+
+                if (latestVideoId) {
+                    showStatus('Step 4/4: Setting last posted video...');
+                    const lastPostedContent = `${latestVideoId}:published`;
+                    await updateFileOnGitHub(token, owner, repo, 'last-posted.txt', lastPostedContent, 'feat: manually set last posted video via wizard');
+                }
+
+                showStatus('🎉 Configuration complete! Your bot is now set up and ready to go.');
+
+            } catch (error) {
+                showStatus(`Error: ${error.message}`, true);
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Configure My Bot';
+            }
+        });
+    </script>
+</body>
+</html>
