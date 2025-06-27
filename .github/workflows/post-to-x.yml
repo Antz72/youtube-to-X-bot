@@ -2,7 +2,7 @@ name: YouTube to X Bot
 
 on:
   schedule:
-    # This runs the workflow every 30 minutes.
+    # This runs the workflow every hour at half past.
     - cron: '30 * * * *'
   
   # This allows you to manually trigger the workflow from the GitHub Actions tab.
